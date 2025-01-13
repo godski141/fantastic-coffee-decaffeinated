@@ -7,6 +7,10 @@ import (
 	"log"
 )
 
+type ConvIDResponse struct {
+	ID    string `json:"convID"`		
+}
+
 // Handler per GET /conversations
 func (rt *_router) getUserConversations(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	userID := r.Header.Get("Authorization")
@@ -14,6 +18,15 @@ func (rt *_router) getUserConversations(w http.ResponseWriter, r *http.Request, 
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	log.Println("DEBUG: Verifica se l'utente esiste nel database con ID:", userID)
+
+    // Controlla se l'utente esiste nel database
+    _, err := rt.db.GetUserByID(userID)
+    if err != nil {
+        log.Println("ERROR: Utente non trovato nel database. ID:", userID)
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
 	log.Println("DEBUG: Caricando tutte le conversazioni in una lista per l'utente con ID:", userID)
 	conversations, err := rt.db.GetUserConversations(userID)
 	if err != nil {
@@ -21,6 +34,8 @@ func (rt *_router) getUserConversations(w http.ResponseWriter, r *http.Request, 
 		http.Error(w, "Error fetching conversations", http.StatusInternalServerError)
 		return
 	}
+
+
 	log.Println("DEBUG: Caricate tutte le conversazioni correttamente per l'utente con ID:", userID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(conversations)
@@ -34,6 +49,14 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	
+	// Controlla se l'utente esiste nel database
+	_, err := rt.db.GetUserByID(creatorID)
+    if err != nil {
+        log.Println("ERROR: Utente non trovato nel database. ID:", creatorID)
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
 
 	// Decodifica il requestBody
 	var req struct {
@@ -43,6 +66,13 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+
+	//Verifica che il campo username non sia vuoto
+	if req.Username == "" {
+        log.Println("ERROR: Il campo 'username' è vuoto o mancante")
+        http.Error(w, "Invalid request body", http.StatusBadRequest)
+        return
+    }
 
 	userID, err := rt.db.GetUserByName(req.Username)
 
@@ -54,21 +84,15 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 	}
 
 	// Creazione della conversazione nel database
-	convID, convName, convPhoto, err := rt.db.CreatePrivateConversation(creatorID, userID)
+	convID, err := rt.db.CreatePrivateConversation(creatorID, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	res := struct {
-		ID    string `json:"id"`
-		Name  string `json:"name"`
-		Photo string `json:"photo"`
-	}{
-		ID:    convID,
-		Name:  convName,
-		Photo: convPhoto,
-	}
+	
+	
+	res := ConvIDResponse{ID : convID}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(res)

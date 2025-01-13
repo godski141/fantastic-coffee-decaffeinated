@@ -48,7 +48,7 @@ type AppDatabase interface {
     GetUserConversations(userID string) ([]Conversation, error)
     GetConversationByID(convID string) (Conversation, error)
     DeleteConversation(convID string) error
-    CreatePrivateConversation(user1 string, user2 string) (string, string, string, error)
+    CreatePrivateConversation(user1 string, user2 string) (string, error)
 	
 	Ping() error
 }

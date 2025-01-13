@@ -64,7 +64,7 @@ paths:
         - conversations
       summary: Start a new private conversation (1:1)
       description: >
-        Starts a new conversation with another user. If a conversation already exists, it is returned.
+        Starts a new conversation with another user and returns the id of the conversation.
       operationId: createPrivateConversation
       security:
         - bearerAuth: []
@@ -135,39 +135,6 @@ paths:
           description: Conversation not found
         '403':
           description: Forbidden
-  /conversations/{convId}/photo:
-  patch:
-    tags:
-      - conversations
-    summary: Update conversation photo
-    operationId: updateConversationPhoto
-    security:
-      - bearerAuth: []
-    parameters:
-      - name: convId
-        in: path
-        required: true
-        description: The ID of the conversation
-        schema:
-          type: string
-    requestBody:
-      description: New conversation photo
-      required: true
-      content:
-        multipart/form-data:
-          schema:
-            type: object
-            properties:
-              photo:
-                type: string
-                format: binary
-    responses:
-      '200':
-        description: Conversation photo updated successfully
-      '403':
-        description: Not authorized to update this photo
-      '404':
-        description: Conversation not found
   /messages:
     post:
       tags:
@@ -538,7 +505,7 @@ components:
           example: "conv12345"
         name:
           type: string
-          example: "Project Discussion"
+          example: "username1"
         type:
           type: string
           enum:

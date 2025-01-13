@@ -11,7 +11,7 @@ import (
 func (db *appdbimpl) GetUserConversations(userID string) ([]Conversation, error) {
     // Execute the SQL query to get the conversations associated with the user from the tables 'conversations' and 'conversation_members'
     rows, err := db.c.Query(`
-        SELECT c.id, c.name, c.type, c.creator_id, c.photo, m.content AS lastMessage
+        SELECT c.id, cm.nickname, c.type, c.creator_id, c.photo, m.content AS lastMessage
         FROM conversations c
         JOIN conversation_members cm ON c.id = cm.conversation_id
         LEFT JOIN messages m ON c.lastMessageId = m.id
@@ -28,10 +28,14 @@ func (db *appdbimpl) GetUserConversations(userID string) ([]Conversation, error)
     for rows.Next() {
         var conv Conversation
         // Scan the values from the row into the Conversation struct
-        if err := rows.Scan(&conv.ID, &conv.Name, &conv.Type, &conv.CreatorID, &conv.Photo, &conv.LastMessage); err != nil {
+        if err := rows.Scan(&conv.ConvID, &conv.Name, &conv.Type, &conv.CreatorID, &conv.Photo, &conv.LastMessage); err != nil {
             return nil, err // Return an error if scanning fails
         }
         conversations = append(conversations, conv) // Add the conversation to the slice
+    }
+
+    if conversations == nil {
+        conversations = []Conversation{}
     }
 
     return conversations, nil // Return the list of conversations
@@ -45,7 +49,7 @@ func (db *appdbimpl) GetConversationByID(convID string) (Conversation, error) {
     err := db.c.QueryRow(`
         SELECT id, name, type, creator_id
         FROM conversations
-        WHERE id = ?`, convID).Scan(&conv.ID, &conv.Name, &conv.Type, &conv.CreatorID)
+        WHERE id = ?`, convID).Scan(&conv.ConvID, &conv.Name, &conv.Type, &conv.CreatorID)
 
     if err != nil {
         return conv, err // Return an error if the query fails or no row is found
@@ -61,23 +65,23 @@ func (db *appdbimpl) DeleteConversation(convID string) error {
     return err // Return any error that occurs during execution
 }
 
-func (db *appdbimpl) CreatePrivateConversation(user1 string, user2 string) (string, string, string, error) {
+func (db *appdbimpl) CreatePrivateConversation(user1 string, user2 string) (string, error) {
     // Controllo se l'utente sta cercando di creare una conversazione con se stesso
     if user1 == user2 {
-        return "", "", "", fmt.Errorf("400: cannot create a conversation with yourself")
+        return "", fmt.Errorf("400: cannot create a conversation with yourself")
     }
 
     // Controlla se la conversazione esiste già e recupera nome e foto
-    var convID, convName, convPhoto string
+    var convID string
     err := db.c.QueryRow(`
-        SELECT c.id, c.name, c.photo FROM conversations c
+        SELECT c.id FROM conversations c
         JOIN conversation_members cm1 ON c.id = cm1.conversation_id
         JOIN conversation_members cm2 ON c.id = cm2.conversation_id
         WHERE cm1.user_id = ? AND cm2.user_id = ? AND c.type = 'private'
-    `, user1, user2).Scan(&convID, &convName, &convPhoto)
+    `, user1, user2).Scan(&convID)
 
     if err == nil {
-        return convID, convName, convPhoto, nil // La conversazione esiste già, restituiamo i dettagli
+        return convID, nil // La conversazione esiste già, restituiamo i dettagli
     }
 
     // Recupera il nome e la foto dell'utente 2
@@ -85,51 +89,51 @@ func (db *appdbimpl) CreatePrivateConversation(user1 string, user2 string) (stri
     err = db.c.QueryRow(`SELECT name, photo FROM users WHERE id = ?`, user2).Scan(&user2Name, &user2Photo)
     log.Println("DEBUG: ERROR:", err)
     if err != nil {
-        return "", "", "", fmt.Errorf("404: user not found")
+        return "", fmt.Errorf("404: user not found")
     }
 
     // Inizia una transazione per garantire la coerenza
     tx, err := db.c.Begin()
     if err != nil {
-        return "", "", "", err
+        return "", err
     }
 
     // Inserisce la nuova conversazione nella tabella conversations con il nome dell'altro utente e la sua foto profilo
     result, err := tx.Exec(`
         INSERT INTO conversations (name, type, creator_id, lastMessageId, photo)
-        VALUES (?, 'private', ?, NULL, ?)`, user2Name, user1, user2Photo)
+        VALUES (?, 'private', ?, NULL, ?)`, "private chat", user1, user2Photo)
     if err != nil {
         tx.Rollback()
-        return "", "", "", err
+        return "", err
     }
 
     // Recupera l'ID della nuova conversazione
     newConvID, err := result.LastInsertId()
     if err != nil {
         tx.Rollback()
-        return "", "", "", err
+        return "", err
     }
 
     // Inserisce i membri della conversazione nella tabella conversation_members
     _, err = tx.Exec(`
-        INSERT INTO conversation_members (conversation_id, user_id) VALUES (?, ?)`, newConvID, user1)
+        INSERT INTO conversation_members (conversation_id, user_id, nickname) VALUES (?, ?, ?)`, newConvID, user1, user2Name)
     if err != nil {
         tx.Rollback()
-        return "", "", "", err
+        return "", err
     }
-
+    user1name, _ := db.GetUserByID(user1)
     _, err = tx.Exec(`
-        INSERT INTO conversation_members (conversation_id, user_id) VALUES (?, ?)`, newConvID, user2)
+        INSERT INTO conversation_members (conversation_id, user_id, nickname) VALUES (?, ?, ?)`, newConvID, user2, user1name)
     if err != nil {
         tx.Rollback()
-        return "", "", "", err
+        return "", err
     }
 
     // Conferma la transazione
     if err := tx.Commit(); err != nil {
-        return "", "", "", err
+        return "", err
     }
 
-    return fmt.Sprintf("%d", newConvID), user2Name, user2Photo, nil
+    return fmt.Sprintf("%d", newConvID),  nil
 }
 

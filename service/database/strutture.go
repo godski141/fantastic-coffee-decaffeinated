@@ -8,7 +8,7 @@ type User struct {
 }
 
 type Conversation struct {
-    ID        string
+    ConvID        string
     Name      string
     Type      string
     CreatorID string
