@@ -51,6 +51,9 @@ type AppDatabase interface {
     GetConversationByID(convID string) (Conversation, error)
     DeleteConversation(convID string) error
     CreatePrivateConversation(user1 string, user2 string) (string, error)
+    IsUserInConversation(userID, convID string) (bool, error)
+    GetOtherUserDetailsInConversation(convID, userID string) (string, string, error)
+    ConversationExists(convID string) (bool, error)
 	
 	Ping() error
 }

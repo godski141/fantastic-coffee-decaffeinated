@@ -155,3 +155,50 @@ func (db *appdbimpl) CreatePrivateConversation(user1 string, user2 string) (stri
     return fmt.Sprintf("%d", newConvID),  nil
 }
 
+
+// IsUserInConversation verifica se un utente è membro di una conversazione
+func (db *appdbimpl) IsUserInConversation(userID, convID string) (bool, error) {
+    var exists bool
+    err := db.c.QueryRow(`
+        SELECT EXISTS (
+            SELECT 1 FROM conversation_members WHERE user_id = ? AND conversation_id = ?
+        )
+    `, userID, convID).Scan(&exists)
+
+    if err != nil {
+        return false, err
+    }
+
+    return exists, nil
+}
+
+func (db *appdbimpl) GetOtherUserDetailsInConversation(convID, userID string) (string, string, error) {
+    var otherUserName, otherUserPhoto string
+    err := db.c.QueryRow(`
+        SELECT u.name, u.photo
+        FROM users u
+        JOIN conversation_members cm ON u.id = cm.user_id
+        WHERE cm.conversation_id = ? AND cm.user_id != ?
+    `, convID, userID).Scan(&otherUserName, &otherUserPhoto)
+
+    if err != nil {
+        return "", "", err
+    }
+
+    return otherUserName, otherUserPhoto, nil
+}
+
+func (db *appdbimpl) ConversationExists(convID string) (bool, error) {
+    var exists bool
+    err := db.c.QueryRow(`
+        SELECT EXISTS (
+            SELECT 1 FROM conversations WHERE id = ?
+        )
+    `, convID).Scan(&exists)
+
+    if err != nil {
+        return false, err
+    }
+
+    return exists, nil
+}

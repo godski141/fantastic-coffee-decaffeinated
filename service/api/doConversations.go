@@ -103,7 +103,36 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 
 // Handler per GET /conversations/{convId}
 func (rt *_router) getConversationByID(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+
 	convID := ps.ByName("convId")
+
+	exists, err := rt.db.ConversationExists(convID)
+    if err != nil {
+        http.Error(w, "Error checking conversation existence", http.StatusInternalServerError)
+        return
+    }
+    if !exists {
+        http.Error(w, "Conversation not found", http.StatusNotFound)
+        return
+    }
+
+	userID := r.Header.Get("Authorization")
+
+	if userID == "" {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+	isMember, err := rt.db.IsUserInConversation(userID, convID)
+    if err != nil {
+        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
+        return
+    }
+
+    if !isMember {
+        http.Error(w, "Forbidden: You are not a member of this conversation", http.StatusForbidden)
+        return
+    }
 
 	conversation, err := rt.db.GetConversationByID(convID)
 	if err != nil {
@@ -111,19 +140,60 @@ func (rt *_router) getConversationByID(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
+	// Se la conversazione è privata, cambia il nome e la foto in base all'utente
+    if conversation.Type == "private" {
+        otherUserName, otherUserPhoto, err := rt.db.GetOtherUserDetailsInConversation(convID, userID)
+        if err != nil {
+            http.Error(w, "Error retrieving other user details", http.StatusInternalServerError)
+            return
+        }
+        conversation.Name = otherUserName
+        conversation.Photo = otherUserPhoto
+    }
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(conversation)
 }
 
 // Handler per DELETE /conversations/{convId}
 func (rt *_router) deleteConversation(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	convID := ps.ByName("convId")
+    convID := ps.ByName("convId")
 
-	err := rt.db.DeleteConversation(convID)
-	if err != nil {
-		http.Error(w, "Error deleting conversation", http.StatusInternalServerError)
-		return
-	}
+    // Recupera l'ID dell'utente autenticato
+    userID := r.Header.Get("Authorization")
+    if userID == "" {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
 
-	w.WriteHeader(http.StatusNoContent)
+    // Controlla se la conversazione esiste
+    exists, err := rt.db.ConversationExists(convID)
+    if err != nil {
+        http.Error(w, "Error checking conversation existence", http.StatusInternalServerError)
+        return
+    }
+    if !exists {
+        http.Error(w, "Conversation not found", http.StatusNotFound)
+        return
+    }
+
+    // Verifica se l'utente è un membro della conversazione
+    isMember, err := rt.db.IsUserInConversation(userID, convID)
+    if err != nil {
+        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
+        return
+    }
+    if !isMember {
+        http.Error(w, "Forbidden: You are not a member of this conversation", http.StatusForbidden)
+        return
+    }
+
+    // Procede con l'eliminazione della conversazione
+    err = rt.db.DeleteConversation(convID)
+    if err != nil {
+        http.Error(w, "Error deleting conversation", http.StatusInternalServerError)
+        return
+    }
+
+    w.WriteHeader(http.StatusNoContent)
 }
