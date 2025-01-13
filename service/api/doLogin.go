@@ -2,65 +2,51 @@ package api
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
-
 	"github.com/julienschmidt/httprouter"
 )
 
 type LoginRequest struct {
-    Name string `json:"name"`
+    Name string `json:"username"`
 }
 
 type LoginResponse struct {
-    Identifier string `json:"identifier"`
+    Identifier string `json:"userID"`
 }
 
 
 // doLogin handles POST /session
 func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-    log.Println("DEBUG: Received login request")
 
+    // Decodifica il corpo della richiesta
     var req LoginRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        log.Println("ERROR: Failed to decode request body:", err)
         http.Error(w, "Invalid request", http.StatusBadRequest)
         return
     }
 
-    log.Println("DEBUG: Request body decoded successfully. Name:", req.Name)
-
-    // Check if name is empty
+    // Verifica che il campo Name non sia vuoto
     if req.Name == "" {
-        log.Println("ERROR: Name cannot be empty")
         http.Error(w, "Name cannot be empty", http.StatusBadRequest)
         return
     }
 
-    log.Println("DEBUG: Checking if user exists in database")
-
-    // Check if user exists
+    // Controlla se l'utente esiste nel database
     id, err := rt.db.GetUserByName(req.Name)
     if err != nil {
-        log.Println("DEBUG: User not found. Attempting to create new user...")
 
-        // If user does not exist, create a new user
+        // Se l'utente non esiste, crea un nuovo utente
         id, err = rt.db.CreateUser(req.Name)
         if err != nil {
-            log.Println("ERROR: Failed to create user in database:", err)
+
+            // Se c'è un errore nella creazione dell'utente, ritorna errore
             http.Error(w, "Error creating user", http.StatusInternalServerError)
             return
         }
-
-        log.Println("DEBUG: New user created successfully. ID:", id)
-    } else {
-        log.Println("DEBUG: User already exists. ID:", id)
     }
     
-    // Respond with the user ID
+    // Invia l'ID dell'utente come risposta
     res := LoginResponse{Identifier: id}
     w.Header().Set("Content-Type", "application/json")
-
-    log.Println("DEBUG: Sending response with user ID:", id)
     json.NewEncoder(w).Encode(res)
 }

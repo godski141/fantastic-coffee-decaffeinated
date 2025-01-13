@@ -17,6 +17,12 @@ func (db *appdbimpl) GetUserByID(id string) (string, error) {
     return name, err
 }
 
+func (db *appdbimpl) GetPhotoByID(id string) (string, error) {
+    var photo string
+    err := db.c.QueryRow("SELECT photo FROM users WHERE id = ?", id).Scan(&photo)
+    return photo, err
+}
+
 func (db *appdbimpl) GetUserByName(name string) (string, error) {
     var id string
     log.Println("DEBUG: Searching for user: ", name)

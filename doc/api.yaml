@@ -23,7 +23,7 @@ paths:
             schema:
               type: object
               properties:
-                name:
+                username:
                   type: string
                   example: Maria
                   pattern: '^.*?$'
@@ -37,16 +37,16 @@ paths:
               schema:
                 type: object
                 properties:
-                  identifier:
+                  userID:
                     type: string
-                    example: "u012345"
+                    example: "12345"
   /conversations:
     get:
       tags:
         - conversations
       summary: Get all the users's conversations 
       description: >
-        The user get all his conversation in a list.
+        Get all the user conversations in a list.
       operationId: getMyConversations
       security:
         - bearerAuth: []
@@ -195,8 +195,8 @@ paths:
               items:
                 type: string
                 description: The ID of the conversation to forward the message to
-                example: "conv67890"
-              example: ["conv67890", "conv67891"]
+                example: "67890"
+              example: ["67890", "67891"]
               required:
                 - targetConversationId
       responses:
@@ -312,7 +312,7 @@ paths:
               properties:
                 userId:
                   type: string
-                  example: "u12345"
+                  example: "12345"
       responses:
         '200':
           description: User added to group
@@ -443,7 +443,7 @@ components:
           type: array
           items:
             type: string
-            example: "u12345"
+            example: "12345"
       required:
         - name
         - members
@@ -452,7 +452,7 @@ components:
       properties:
         conversationId:
           type: string
-          example: "conv12345"
+          example: "12345"
         content:
           type: string
           example: "Hey how r u?"
@@ -464,7 +464,7 @@ components:
       properties:
         id:
           type: string
-          example: "u012345"
+          example: "12345"
         name: 
           type: string
           example: "Giorgio"
@@ -480,10 +480,10 @@ components:
       properties:
         id:
           type: string
-          example: "m12041"
+          example: "12041"
         senderId:
           type: string
-          example: "u012345"
+          example: "12345"
         content:
           type: string
           example: "Hello! today is the 1st of the month"
@@ -502,7 +502,7 @@ components:
       properties:
         id:
           type: string
-          example: "conv12345"
+          example: "12345"
         name:
           type: string
           example: "username1"
@@ -514,7 +514,7 @@ components:
           example: "group"
         creatorId:
           type: string
-          example: "u0123456789"
+          example: "1234567"
         photo:
           type: string
           format: binary
@@ -522,6 +522,7 @@ components:
         lastMessage:
           type: string
           example: "Hello! today is the 1st of the month"
+          nullable: true
       required:
         - id
         - type
@@ -535,7 +536,7 @@ components:
         messageId:
           type: string
           description: The ID of the message to comment on
-          example: "m12345"
+          example: "12345"
       required:
         - emoji
         - messageId

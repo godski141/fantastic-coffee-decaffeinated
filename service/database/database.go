@@ -43,7 +43,9 @@ type AppDatabase interface {
 
 	CreateUser(name string) (string, error)
 	GetUserByID(id string) (string, error)
+    GetPhotoByID(id string) (string, error)
 	GetUserByName(name string) (string, error)
+    
 
     GetUserConversations(userID string) ([]Conversation, error)
     GetConversationByID(convID string) (Conversation, error)
@@ -105,6 +107,7 @@ func New(db *sql.DB) (AppDatabase, error) {
                     conversation_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
                     nickname TEXT,
+                    photo TEXT,
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id),
                     FOREIGN KEY (user_id) REFERENCES users(id),
                     PRIMARY KEY (conversation_id, user_id)

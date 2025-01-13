@@ -4,47 +4,52 @@ import (
 	"encoding/json"
 	"net/http"
 	"github.com/julienschmidt/httprouter"
-	"log"
 )
 
 type ConvIDResponse struct {
 	ID    string `json:"convID"`		
 }
 
+type UsernameRequest struct {
+	Username string `json:"username"`
+}
+
 // Handler per GET /conversations
 func (rt *_router) getUserConversations(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+
+	// Recupera il creatorId dall'header Authorization
 	userID := r.Header.Get("Authorization")
 	if userID == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	log.Println("DEBUG: Verifica se l'utente esiste nel database con ID:", userID)
 
     // Controlla se l'utente esiste nel database
     _, err := rt.db.GetUserByID(userID)
     if err != nil {
-        log.Println("ERROR: Utente non trovato nel database. ID:", userID)
         http.Error(w, "Unauthorized", http.StatusUnauthorized)
         return
     }
-	log.Println("DEBUG: Caricando tutte le conversazioni in una lista per l'utente con ID:", userID)
+
+	// Recupera le conversazioni dell'utente dal database
 	conversations, err := rt.db.GetUserConversations(userID)
 	if err != nil {
-		log.Println("DEBUG: Errore:", err)
 		http.Error(w, "Error fetching conversations", http.StatusInternalServerError)
 		return
 	}
 
-
-	log.Println("DEBUG: Caricate tutte le conversazioni correttamente per l'utente con ID:", userID)
+	// Invia le conversazioni come risposta
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(conversations)
 }
 
 // Handler per POST /conversations
 func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+
 	// Recupera il creatorId dall'header Authorization
 	creatorID := r.Header.Get("Authorization")
+
+	// Verifica che il creatorID non sia vuoto
 	if creatorID == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -52,16 +57,15 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 	
 	// Controlla se l'utente esiste nel database
 	_, err := rt.db.GetUserByID(creatorID)
+
+	// Se l'utente non esiste, ritorna errore
     if err != nil {
-        log.Println("ERROR: Utente non trovato nel database. ID:", creatorID)
         http.Error(w, "Unauthorized", http.StatusUnauthorized)
         return
     }
 
 	// Decodifica il requestBody
-	var req struct {
-		Username string `json:"username"`
-	}
+	var req UsernameRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -69,31 +73,30 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 
 	//Verifica che il campo username non sia vuoto
 	if req.Username == "" {
-        log.Println("ERROR: Il campo 'username' è vuoto o mancante")
         http.Error(w, "Invalid request body", http.StatusBadRequest)
         return
     }
 
-	userID, err := rt.db.GetUserByName(req.Username)
+	// Recupera l'ID dell'utente dal database
+	targetUserID, err := rt.db.GetUserByName(req.Username)
 
-	log.Println("DEBUG: ID:", userID)
-
+	// Se l'utente non esiste, ritorna errore
 	if err!= nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
 	// Creazione della conversazione nel database
-	convID, err := rt.db.CreatePrivateConversation(creatorID, userID)
+	convID, err := rt.db.CreatePrivateConversation(creatorID, targetUserID)
+
+	// Se la creazione fallisce, ritorna errore
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	
-	
+	// Invia l'ID della conversazione come risposta
 	res := ConvIDResponse{ID : convID}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(res)
 }

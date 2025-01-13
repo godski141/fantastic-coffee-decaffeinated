@@ -3,7 +3,7 @@ package database
 import "database/sql"
 
 type User struct {
-    ID   string
+    UserID   string
     Name string
 }
 
@@ -17,7 +17,7 @@ type Conversation struct {
 }
 
 type Message struct {
-    ID             string
+    MessageID             string
     ConversationID string
     SenderID       string
     Content        string
