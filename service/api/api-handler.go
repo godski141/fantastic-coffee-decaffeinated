@@ -13,5 +13,11 @@ func (rt *_router) Handler() http.Handler {
 	// Special routes
 	rt.router.GET("/liveness", rt.liveness)
 
+	// API routes
+	rt.router.POST("/session", rt.doLogin)
+
+	rt.router.POST("/conversations", rt.postConversations)
+	rt.router.GET("/conversations", rt.getUserConversations)
+	
 	return rt.router
 }

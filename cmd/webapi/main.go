@@ -1,8 +1,7 @@
 /*
-Webapi is the executable for the main web server.
-It builds a web server around APIs from `service/api`.
-Webapi connects to external resources needed (database) and starts two web servers: the API web server, and the debug.
-Everything is served via the API web server, except debug variables (/debug/vars) and profiler infos (pprof).
+Package main provides the web API server for the Hilo project.
+WasaTEXT is a messaging platform that allows users to manage conversations,
+send messages, and interact in groups via a RESTful API.
 
 Usage:
 
@@ -28,9 +27,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"git.sapienzaapps.it/fantasticcoffee/fantastic-coffee-decaffeinated/service/api"
-	"git.sapienzaapps.it/fantasticcoffee/fantastic-coffee-decaffeinated/service/database"
-	"git.sapienzaapps.it/fantasticcoffee/fantastic-coffee-decaffeinated/service/globaltime"
+	"WasaTEXT/service/api"
+	"WasaTEXT/service/database"
+	"WasaTEXT/service/globaltime"
 	"github.com/ardanlabs/conf"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sirupsen/logrus"
@@ -173,7 +172,7 @@ func run() error {
 
 		// Log the status of this shutdown.
 		switch {
-		case sig == syscall.SIGSTOP:
+		case sig == syscall.SIGTERM:
 			return errors.New("integrity issue caused shutdown")
 		case err != nil:
 			return fmt.Errorf("could not stop server gracefully: %w", err)
