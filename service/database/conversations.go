@@ -1,14 +1,14 @@
 package database
 
 import (
-    "fmt"
+	"database/sql"
+	"fmt"
 )
 
 // GetUserConversations retrieves all conversations associated with a given user ID.
 // It joins the 'conversations' and 'conversation_members' tables to find conversations
 // where the specified user is a member.
 func (db *appdbimpl) GetUserConversations(userID string) ([]Conversation, error) {
-
     // Esegui la query SQL per recuperare le conversazioni dell'utente
     rows, err := db.c.Query(`
         SELECT c.id, cm.nickname, c.type, c.creator_id, cm.photo, m.content AS lastMessage
@@ -28,15 +28,22 @@ func (db *appdbimpl) GetUserConversations(userID string) ([]Conversation, error)
     // Crea una slice per contenere le conversazioni
     var conversations []Conversation
 
-    //  Scansiona le righe restituite dalla query
+    // Scansiona le righe restituite dalla query
     for rows.Next() {
-
-        // Crea una variabile di tipo Conversation
+        // Crea una variabile di tipo Conversation e una per gestire lastMessage nullable
         var conv Conversation
+        var lastMessage sql.NullString
 
         // Scansiona i valori delle colonne nella struttura Conversation
-        if err := rows.Scan(&conv.ConvID, &conv.Name, &conv.Type, &conv.CreatorID, &conv.Photo, &conv.LastMessage); err != nil {
+        if err := rows.Scan(&conv.ConvID, &conv.Name, &conv.Type, &conv.CreatorID, &conv.Photo, &lastMessage); err != nil {
             return nil, err
+        }
+
+        // Controllo se lastMessage è valido prima di assegnarlo
+        if lastMessage.Valid {
+            conv.LastMessage = lastMessage.String
+        } else {
+            conv.LastMessage = "" // Nessun ultimo messaggio disponibile
         }
 
         // Aggiungi la conversazione alla slice
@@ -54,20 +61,31 @@ func (db *appdbimpl) GetUserConversations(userID string) ([]Conversation, error)
 
 // GetConversationByID retrieves a specific conversation from the database by its ID.
 func (db *appdbimpl) GetConversationByID(convID string) (Conversation, error) {
-    var conv Conversation // Create a Conversation struct to hold the result
+    var conv Conversation
+    var lastMessageID sql.NullString
+    var lastMessageContent sql.NullString
 
-    // Execute the SQL query to get the conversation details by ID
+    // Esegue la query per ottenere i dettagli della conversazione e l'ID dell'ultimo messaggio
     err := db.c.QueryRow(`
-        SELECT id, name, type, creator_id
-        FROM conversations
-        WHERE id = ?`, convID).Scan(&conv.ConvID, &conv.Name, &conv.Type, &conv.CreatorID)
+        SELECT c.id, c.name, c.type, c.creator_id, c.lastMessageId, m.content
+        FROM conversations c
+        LEFT JOIN messages m ON c.lastMessageId = m.id
+        WHERE c.id = ?`, convID).Scan(&conv.ConvID, &conv.Name, &conv.Type, &conv.CreatorID, &lastMessageID, &lastMessageContent)
 
     if err != nil {
-        return conv, err // Return an error if the query fails or no row is found
+        return conv, err // Ritorna errore se la query fallisce o nessuna riga viene trovata
     }
 
-    return conv, nil // Return the conversation details
+    // Se esiste un lastMessage, assegnalo alla struttura della conversazione
+    if lastMessageContent.Valid {
+        conv.LastMessage = lastMessageContent.String
+    } else {
+        conv.LastMessage = "" // Nessun ultimo messaggio disponibile
+    }
+
+    return conv, nil // Ritorna i dettagli della conversazione
 }
+
 
 // DeleteConversation deletes a conversation from the database by its ID.
 func (db *appdbimpl) DeleteConversation(convID string) error {
@@ -76,6 +94,7 @@ func (db *appdbimpl) DeleteConversation(convID string) error {
     return err // Return any error that occurs during execution
 }
 
+// CreatePrivateConversation crea una nuova conversazione privata tra due utenti
 func (db *appdbimpl) CreatePrivateConversation(user1 string, user2 string) (string, error) {
 
     // Controllo se l'utente sta cercando di creare una conversazione con se stesso
@@ -83,7 +102,7 @@ func (db *appdbimpl) CreatePrivateConversation(user1 string, user2 string) (stri
         return "", fmt.Errorf("400: cannot create a conversation with yourself")
     }
 
-    // Controlla se la conversazione esiste già e recupera nome e foto
+    // Controlla se la conversazione esiste già e recupera nome
     var convID string
     err := db.c.QueryRow(`
         SELECT c.id FROM conversations c
@@ -110,7 +129,7 @@ func (db *appdbimpl) CreatePrivateConversation(user1 string, user2 string) (stri
         return "", err
     }
 
-    // Inserisce la nuova conversazione nella tabella conversations con il nome dell'altro utente e la sua foto profilo
+    //  Inserisce una nuova conversazione nella tabella conversations
     result, err := tx.Exec(`
         INSERT INTO conversations (name, type, creator_id, lastMessageId, photo)
         VALUES (?, 'private', ?, NULL, ?)`, "private chat", user1, user2Photo)
@@ -155,7 +174,6 @@ func (db *appdbimpl) CreatePrivateConversation(user1 string, user2 string) (stri
     return fmt.Sprintf("%d", newConvID),  nil
 }
 
-
 // IsUserInConversation verifica se un utente è membro di una conversazione
 func (db *appdbimpl) IsUserInConversation(userID, convID string) (bool, error) {
     var exists bool
@@ -172,6 +190,7 @@ func (db *appdbimpl) IsUserInConversation(userID, convID string) (bool, error) {
     return exists, nil
 }
 
+// GetOtherUserDetailsInConversation recupera il nome e la foto dell'altro utente in una conversazione
 func (db *appdbimpl) GetOtherUserDetailsInConversation(convID, userID string) (string, string, error) {
     var otherUserName, otherUserPhoto string
     err := db.c.QueryRow(`
@@ -188,6 +207,7 @@ func (db *appdbimpl) GetOtherUserDetailsInConversation(convID, userID string) (s
     return otherUserName, otherUserPhoto, nil
 }
 
+// ConversationExists verifica se una conversazione esiste nel database
 func (db *appdbimpl) ConversationExists(convID string) (bool, error) {
     var exists bool
     err := db.c.QueryRow(`

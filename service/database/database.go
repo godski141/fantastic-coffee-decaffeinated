@@ -55,6 +55,9 @@ type AppDatabase interface {
     GetOtherUserDetailsInConversation(convID, userID string) (string, string, error)
     ConversationExists(convID string) (bool, error)
 	
+    InsertMessage(convID string, userID string, text string) (string, error)
+    GetMessageFromID(messageID string) (Message, error)
+    UpdateLastMessage(convID string, messageID string) error
 	Ping() error
 }
 

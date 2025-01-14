@@ -1,10 +1,9 @@
 package database
 
-import "database/sql"
-
 type User struct {
     UserID   string
     Name string
+    Photo string
 }
 
 type Conversation struct {
@@ -13,11 +12,11 @@ type Conversation struct {
     Type      string
     CreatorID string
     Photo     string
-    LastMessage sql.NullString
+    LastMessage string
 }
 
 type Message struct {
-    MessageID             string
+    MessageID      string
     ConversationID string
     SenderID       string
     Content        string

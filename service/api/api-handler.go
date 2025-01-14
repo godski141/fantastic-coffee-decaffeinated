@@ -25,6 +25,8 @@ func (rt *_router) Handler() http.Handler {
 
 	rt.router.GET("/conversations/:convId", rt.getConversationByID)
 	rt.router.DELETE("/conversations/:convId", rt.deleteConversation)
+
+	rt.router.POST("/messages", rt.postMessage)
 	
 	return rt.router
 }

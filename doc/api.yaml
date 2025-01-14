@@ -450,7 +450,7 @@ components:
     NewMessage:
       type: object
       properties:
-        conversationId:
+        ConvId:
           type: string
           example: "12345"
         content:
