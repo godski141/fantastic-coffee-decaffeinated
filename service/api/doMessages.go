@@ -1,7 +1,9 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"github.com/julienschmidt/httprouter"
@@ -12,7 +14,7 @@ type MessageRequest struct {
     Text string `json:"content"`
 }
 
-
+// postMessage handles POST /messages
 func (rt *_router) postMessage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
     // Recupera il creatorId dall'header Authorization
@@ -96,4 +98,70 @@ func (rt *_router) postMessage(w http.ResponseWriter, r *http.Request, _ httprou
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(messageResponse)
 }
+
+// deleteMessage handles DELETE /messages/:messageID
+func (rt *_router) deleteMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    // Recupera il creatorId dall'header Authorization
+	userID := r.Header.Get("Authorization")
+	if userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+    // Controlla se l'utente esiste nel database
+    _, err := rt.db.GetUserByID(userID)
+    if err != nil {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Recupera l'ID del messaggio dalla richiesta
+    messageID := ps.ByName("messageId")
+
+    // Verifica che l'utente sia il mittente del messaggio
+    message, err := rt.db.GetMessageFromID(messageID)
+    log.Println("DEBUG: message->", message)
+    log.Println("DEBUG: message.SenderID->", message.SenderID)
+    log.Println("DEBUG: err->", err)
+    if err != nil {
+        // Se il messaggio non esiste restituisce 404
+        if errors.Is(err, sql.ErrNoRows) {
+        http.Error(w, "Message not found", http.StatusNotFound)
+    } else {
+
+        // Altrimenti restituisce un errore interno del server
+        http.Error(w, "Error fetching message", http.StatusInternalServerError)
+    }
+        return
+    }
+    if message.SenderID != userID {
+        http.Error(w, "Forbidden: You are not the sender of this message", http.StatusForbidden)
+        return
+    }
+
+    // Cancella il messaggio dal database
+    if err := rt.db.DeleteMessage(messageID); err != nil {
+        http.Error(w, "Error deleting message", http.StatusInternalServerError)
+        return
+    }
+
+    // Trova il nuovo ultimo messaggio della conversazione
+    newLastMessageID, err := rt.db.GetLastMessageID(message.ConversationID)
+    if err != nil {
+        log.Println("Error retrieving last message:", err)
+        http.Error(w, "Error updating last message", http.StatusInternalServerError)
+        return
+    }
+
+    // Aggiorna il lastMessageId della conversazione
+    if err := rt.db.UpdateLastMessage(message.ConversationID, newLastMessageID); err != nil {
+        log.Println("Error updating conversation last message:", err)
+        http.Error(w, "Error updating last message", http.StatusInternalServerError)
+        return
+    }
+
+    // Invia una risposta vuota
+    w.WriteHeader(http.StatusNoContent)
+}
+
 

@@ -58,6 +58,10 @@ type AppDatabase interface {
     InsertMessage(convID string, userID string, text string) (string, error)
     GetMessageFromID(messageID string) (Message, error)
     UpdateLastMessage(convID string, messageID string) error
+    MessageExists(messageID string) (bool, error)
+    DeleteMessage(messageID string) error
+    GetLastMessageID(convID string) (string, error)
+
 	Ping() error
 }
 
