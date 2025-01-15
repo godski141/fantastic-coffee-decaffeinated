@@ -102,6 +102,46 @@ func (db *appdbimpl) GetLastMessageID(convID string) (string, error) {
         }
         return "", err
     }
-
     return lastMessageID.String, nil
+}
+
+// InsertReaction inserisce una reazione a un messaggio nel database
+func (db *appdbimpl) InsertReaction(userID string, messageID string, reaction string) error {
+    // Controlla se l'utente ha già reagito a questo messaggio
+    var exists bool
+    err := db.c.QueryRow(
+        "SELECT EXISTS(SELECT 1 FROM reactions WHERE message_id = ? AND user_id = ?)",
+        messageID, userID,
+    ).Scan(&exists)
+    if err != nil {
+        return err
+    }
+
+    // Se esiste già una reazione, la rimuove prima di aggiungere la nuova
+    if exists {
+        _, err = db.c.Exec(
+            "DELETE FROM reactions WHERE message_id = ? AND user_id = ?",
+            messageID, userID,
+        )
+        if err != nil {
+            return err
+        }
+    }
+
+    // Inserisce la nuova reazione
+    _, err = db.c.Exec(
+        "INSERT INTO reactions (message_id, user_id, reaction) VALUES (?, ?, ?)",
+        messageID, userID, reaction,
+    )
+    if err != nil {
+        return err
+    }
+
+    // Aggiorna il contatore delle reazioni nel messaggio
+    _, err = db.c.Exec(
+        "UPDATE messages SET reaction_count = reaction_count + 1 WHERE id = ?",
+        messageID,
+    )
+
+    return err
 }

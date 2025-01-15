@@ -18,6 +18,10 @@ type ConversationsRequest struct {
     ID string `json:"Id"`
 }
 
+type ReactionRequest struct {
+    Reaction string `json:"reaction"`
+}
+
 // postMessage handles POST /messages
 func (rt *_router) postMessage(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
@@ -271,4 +275,70 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
     json.NewEncoder(w).Encode(messageResponse)
 }
 
+// commentMessage handles POST /messages/:messageID/comment
+func (rt *_router) commentMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    // Recupera il creatorId dall'header Authorization
+    userID := r.Header.Get("Authorization")
+    if userID == "" {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
 
+    // Controlla se l'utente esiste nel database
+    _, err := rt.db.GetUserByID(userID)
+    if err != nil {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Recupera l'ID del messaggio dalla richiesta
+    messageID := ps.ByName("messageId")
+
+    // Verifica che il messaggio esista
+    message, err := rt.db.GetMessageFromID(messageID)
+    if err != nil {
+        if errors.Is(err, sql.ErrNoRows) {
+            http.Error(w, "Message not found", http.StatusNotFound)
+        } else {
+            http.Error(w, "Error fetching message", http.StatusInternalServerError)
+        }
+        return
+    }
+
+    // Verifica che l'utente sia un membro della conversazione associata al messaggio
+    isMember, err := rt.db.IsUserInConversation(userID, message.ConversationID)
+    if err != nil {
+        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
+        return
+    }
+    if !isMember {
+        http.Error(w, "Forbidden: You are not a member of the message's conversation", http.StatusForbidden)
+        return
+    }
+
+    // Lettura del body della richiesta
+    var req ReactionRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "Invalid request body", http.StatusBadRequest)
+        return
+    }
+
+    // Verifica che il campo reaction non sia vuoto e sia massimo di 3 caratteri
+    if req.Reaction == "" {
+        http.Error(w, "Reaction cannot be empty", http.StatusBadRequest)
+        return
+    }
+    if len(req.Reaction) > 3 {
+        http.Error(w, "Reaction must be at most 3 characters long", http.StatusBadRequest)
+        return
+    }
+
+    // Inserisci la reazione nel database associando a userID e messageID
+    if err := rt.db.InsertReaction(userID, messageID, req.Reaction); err != nil {
+        http.Error(w, "Error inserting reaction", http.StatusInternalServerError)
+        return
+    }
+
+    // Invia una risposta vuota
+    w.WriteHeader(http.StatusNoContent)
+}

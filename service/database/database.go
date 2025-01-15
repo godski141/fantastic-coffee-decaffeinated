@@ -61,6 +61,7 @@ type AppDatabase interface {
     MessageExists(messageID string) (bool, error)
     DeleteMessage(messageID string) error
     GetLastMessageID(convID string) (string, error)
+    InsertReaction(messageID string, userID string, reaction string) error 
 
 	Ping() error
 }
@@ -77,7 +78,7 @@ func New(db *sql.DB) (AppDatabase, error) {
     }
 
     // Check if tables exist. If not, the database is empty, and we need to create the structure
-    tables := []string{"users", "conversations", "messages", "conversation_members"}
+    tables := []string{"users", "conversations", "messages", "conversation_members", "reactions"}
     for _, table := range tables {
         var tableName string
         err := db.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?;`, table).Scan(&tableName)
@@ -107,6 +108,7 @@ func New(db *sql.DB) (AppDatabase, error) {
                     conversation_id INTEGER NOT NULL,
                     sender_id INTEGER NOT NULL,
                     content TEXT NOT NULL,
+                    reaction_count INTEGER DEFAULT 0,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                     status TEXT CHECK(status IN ('sent', 'received', 'read')) NOT NULL,
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id),
@@ -122,6 +124,17 @@ func New(db *sql.DB) (AppDatabase, error) {
                     FOREIGN KEY (user_id) REFERENCES users(id),
                     PRIMARY KEY (conversation_id, user_id)
                 );`
+            case "reactions":
+                sqlStmt = `CREATE TABLE reactions (
+                    message_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    reaction TEXT NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (message_id, user_id),  -- Un utente può reagire una sola volta per messaggio
+                    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );`
+
             }
             _, err = db.Exec(sqlStmt)
             if err != nil {
