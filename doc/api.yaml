@@ -135,6 +135,38 @@ paths:
           description: Conversation not found
         '403':
           description: Forbidden
+  /conversations/{convId}/messages:
+    get:
+      tags:
+        - conversations
+      summary: Get all messages from a conversation
+      description: >
+        Retrieve all messages from a conversation, ordered by timestamp (oldest first).
+        Messages include the sender, timestamp, and reactions (if any).
+      operationId: getMessagesFromConversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/convId'
+      responses:
+        '200':
+          description: Messages loaded successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items: 
+                  $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid request (e.g., invalid conversation ID)
+        '401':
+          description: Unauthorized (user not logged in)
+        '403':
+          description: Forbidden (user is not a member of the conversation)
+        '404':
+          description: Conversation not found
+        '500':
+          description: Internal server error
   /messages:
     post:
       tags:
@@ -489,9 +521,20 @@ components:
         status:
           type: string
           enum:
-            - sent
-            - received
-            - read
+          - sent
+          - received
+          - read
+        reactions:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+                example: "1"
+              Reaction:
+                type: string
+                example: "xD"
     Conversation:
       type: object
       properties:

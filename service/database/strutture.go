@@ -22,7 +22,7 @@ type Message struct {
     Content        string
     Timestamp      string
     Status         string
-    Reactions []Reaction `json:"reactions"`
+    Reactions []Reaction 
 }
 
 type Comment struct {
@@ -31,6 +31,6 @@ type Comment struct {
 }
 
 type Reaction struct {
-    UserID   string `json:"userId"`
-    Reaction string `json:"reaction"`
+    UserID   string 
+    Reaction string 
 }

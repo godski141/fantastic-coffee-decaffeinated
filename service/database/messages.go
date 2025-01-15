@@ -180,7 +180,7 @@ func (db *appdbimpl) UserHasReaction(messageID, userID string) (bool, error) {
 func (db *appdbimpl) GetMessagesFromConversation(conversationID string) ([]Message, error) {
     rows, err := db.c.Query(`
         SELECT 
-            m.id, m.sender_id, m.content, m.timestamp, m.status,
+            m.id, m.conversation_id, m.sender_id, m.content, m.timestamp, m.status,
             COALESCE(r.user_id, '') AS reactionUser, 
             COALESCE(r.reaction, '') AS reaction
         FROM messages m
@@ -196,9 +196,9 @@ func (db *appdbimpl) GetMessagesFromConversation(conversationID string) ([]Messa
     messages := make(map[string]Message)
 
     for rows.Next() {
-        var msgID, senderID, content, timestamp, status, reactionUser, reaction string
+        var msgID, convId, senderID, content, timestamp, status, reactionUser, reaction string
 
-        if err := rows.Scan(&msgID, &senderID, &content, &timestamp, &status, &reactionUser, &reaction); err != nil {
+        if err := rows.Scan(&msgID, &convId, &senderID, &content, &timestamp, &status, &reactionUser, &reaction); err != nil {
             return nil, err
         }
 
@@ -206,6 +206,7 @@ func (db *appdbimpl) GetMessagesFromConversation(conversationID string) ([]Messa
         if _, exists := messages[msgID]; !exists {
             messages[msgID] = Message{
                 MessageID: msgID,
+                ConversationID: convId,
                 SenderID:  senderID,
                 Content:   content,
                 Timestamp: timestamp,
