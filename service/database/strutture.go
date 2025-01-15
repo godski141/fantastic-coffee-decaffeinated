@@ -22,9 +22,15 @@ type Message struct {
     Content        string
     Timestamp      string
     Status         string
+    Reactions []Reaction `json:"reactions"`
 }
 
 type Comment struct {
     Emoji     string
     MessageID string
+}
+
+type Reaction struct {
+    UserID   string `json:"userId"`
+    Reaction string `json:"reaction"`
 }

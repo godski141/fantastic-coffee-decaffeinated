@@ -54,6 +54,7 @@ type AppDatabase interface {
     IsUserInConversation(userID, convID string) (bool, error)
     GetOtherUserDetailsInConversation(convID, userID string) (string, string, error)
     ConversationExists(convID string) (bool, error)
+    GetMessagesFromConversation(conversationID string) ([]Message, error)
 	
     InsertMessage(convID string, userID string, text string) (string, error)
     GetMessageFromID(messageID string) (Message, error)

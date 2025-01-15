@@ -176,3 +176,61 @@ func (db *appdbimpl) UserHasReaction(messageID, userID string) (bool, error) {
     return exists, err
 }
 
+// GetMessagesFromConversation recupera tutti i messaggi di una conversazione dal database
+func (db *appdbimpl) GetMessagesFromConversation(conversationID string) ([]Message, error) {
+    rows, err := db.c.Query(`
+        SELECT 
+            m.id, m.sender_id, m.content, m.timestamp, m.status,
+            COALESCE(r.user_id, '') AS reactionUser, 
+            COALESCE(r.reaction, '') AS reaction
+        FROM messages m
+        LEFT JOIN reactions r ON m.id = r.message_id
+        WHERE m.conversation_id = ?
+        ORDER BY m.timestamp ASC`, conversationID)
+
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    messages := make(map[string]Message)
+
+    for rows.Next() {
+        var msgID, senderID, content, timestamp, status, reactionUser, reaction string
+
+        if err := rows.Scan(&msgID, &senderID, &content, &timestamp, &status, &reactionUser, &reaction); err != nil {
+            return nil, err
+        }
+
+        // Se il messaggio non è già nella mappa, lo aggiungiamo
+        if _, exists := messages[msgID]; !exists {
+            messages[msgID] = Message{
+                MessageID: msgID,
+                SenderID:  senderID,
+                Content:   content,
+                Timestamp: timestamp,
+                Status:    status,
+                Reactions: []Reaction{},
+            }
+        }
+
+        // Se c'è una reazione, la aggiungiamo
+        if reactionUser != "" {
+            msg := messages[msgID]
+            msg.Reactions = append(msg.Reactions, Reaction{
+                UserID:   reactionUser,
+                Reaction: reaction,
+            })
+            messages[msgID] = msg
+        }
+    }
+
+    // Convertiamo la mappa in una slice di messaggi
+    messageList := make([]Message, 0, len(messages))
+    for _, msg := range messages {
+        messageList = append(messageList, msg)
+    }
+
+    return messageList, nil
+}
+

@@ -197,3 +197,57 @@ func (rt *_router) deleteConversation(w http.ResponseWriter, r *http.Request, ps
 
     w.WriteHeader(http.StatusNoContent)
 }
+
+// Handler per GET /conversations/{convId}/messages
+func (rt *_router) getMessagesFromConversation(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    // Recupera l'userID dall'header Authorization
+    userID := r.Header.Get("Authorization")
+    if userID == "" {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Verifica che l'utente esista nel database
+    _, err := rt.db.GetUserByID(userID)
+    if err != nil {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Recupera l'ID della conversazione dalla richiesta
+    conversationID := ps.ByName("convId")
+
+    // Verifica che la conversazione esista
+    exists, err := rt.db.ConversationExists(conversationID)
+    if err != nil {
+        http.Error(w, "Error checking conversation existence", http.StatusInternalServerError)
+        return
+    }
+    if !exists {
+        http.Error(w, "Conversation not found", http.StatusNotFound)
+        return
+    }
+
+    // Verifica che l'utente sia un membro della conversazione
+    isMember, err := rt.db.IsUserInConversation(userID, conversationID)
+    if err != nil {
+        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
+        return
+    }
+    if !isMember {
+        http.Error(w, "Forbidden: You are not a member of this conversation", http.StatusForbidden)
+        return
+    }
+
+    // Recupera tutti i messaggi della conversazione
+    messages, err := rt.db.GetMessagesFromConversation(conversationID)
+    if err != nil {
+        http.Error(w, "Error fetching messages", http.StatusInternalServerError)
+        return
+    }
+
+    // Invia i messaggi come risposta
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(messages)
+}
+
