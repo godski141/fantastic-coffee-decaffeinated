@@ -32,6 +32,8 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.POST("/messages/:messageId", rt.forwardMessage)
 	rt.router.POST("/messages/:messageId/comment", rt.commentMessage)
 	rt.router.DELETE("/messages/:messageId/uncomment", rt.unCommentMessage)
+
+	rt.router.POST("/groups", rt.createGroup)
 	
 	return rt.router
 }

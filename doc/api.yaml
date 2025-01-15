@@ -87,13 +87,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Conversation'
+                type: object
+                properties:
+                  convId:
+                    type: string
+                    example: "1"
         '201':
           description: New conversation created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Conversation'
+                type: object
+                properties:
+                  convId:
+                    type: string
+                    example: "1"
         '400':
           description: Invalid request
         '404':
@@ -290,7 +298,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Conversation'
+                type: object
+                properties:
+                  convId:
+                    type: string
+                    example: "1"
         '400':
           description: Invalid request
   /groups/{groupId}/name:
@@ -470,7 +482,7 @@ components:
           type: array
           items:
             type: string
-            example: "12345"
+            example: "hanni"
       required:
         - name
         - members

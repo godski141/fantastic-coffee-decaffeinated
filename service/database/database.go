@@ -55,6 +55,8 @@ type AppDatabase interface {
     GetOtherUserDetailsInConversation(convID, userID string) (string, string, error)
     ConversationExists(convID string) (bool, error)
     GetMessagesFromConversation(conversationID string) ([]Message, error)
+    IsConversationPrivate(convID string) (bool, error)
+    IsUserCreatorOfConversation(userID, convID string) (bool, error)
 	
     InsertMessage(convID string, userID string, text string) (string, error)
     GetMessageFromID(messageID string) (Message, error)
@@ -65,6 +67,9 @@ type AppDatabase interface {
     InsertReaction(messageID string, userID string, reaction string) error
     DeleteReaction(messageID, userID string) error
     UserHasReaction(messageID, userID string) (bool, error)
+
+    CreateGroup(name, creatorID string) (string, error)
+    AddUserToGroup(groupID, userID string) error
 
 	Ping() error
 }

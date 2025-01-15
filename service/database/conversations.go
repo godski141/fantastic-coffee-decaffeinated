@@ -86,12 +86,20 @@ func (db *appdbimpl) GetConversationByID(convID string) (Conversation, error) {
     return conv, nil // Ritorna i dettagli della conversazione
 }
 
-
 // DeleteConversation deletes a conversation from the database by its ID.
 func (db *appdbimpl) DeleteConversation(convID string) error {
     // Execute the SQL command to delete the conversation by ID
     _, err := db.c.Exec(`DELETE FROM conversations WHERE id = ?`, convID)
-    return err // Return any error that occurs during execution
+    if err != nil {
+        return err // Return any error that occurs during execution
+    }
+    _, err = db.c.Exec(`DELETE FROM conversation_members WHERE conversation_id = ?`, convID)
+
+    if err != nil {
+        return err // Return any error that occurs during execution
+    }
+
+    return nil // Return any error that occurs during execution
 }
 
 // CreatePrivateConversation crea una nuova conversazione privata tra due utenti
@@ -221,4 +229,36 @@ func (db *appdbimpl) ConversationExists(convID string) (bool, error) {
     }
 
     return exists, nil
+}
+
+// isConversationPrivate verifica se una conversazione è di tipo privato
+func (db *appdbimpl) IsConversationPrivate(convID string) (bool, error) {
+    var isPrivate bool
+    err := db.c.QueryRow(`
+        SELECT EXISTS (
+            SELECT 1 FROM conversations WHERE id = ? AND type = 'private'
+        )
+    `, convID).Scan(&isPrivate)
+
+    if err != nil {
+        return false, err
+    }
+
+    return isPrivate, nil
+}
+
+// isUserCreatorOfConversation verifica se un utente è il creatore di una conversazione
+func (db *appdbimpl) IsUserCreatorOfConversation(userID, convID string) (bool, error) {
+    var isCreator bool
+    err := db.c.QueryRow(`
+        SELECT EXISTS (
+            SELECT 1 FROM conversations WHERE id = ? AND creator_id = ?
+        )
+    `, convID, userID).Scan(&isCreator)
+
+    if err != nil {
+        return false, err
+    }
+
+    return isCreator, nil
 }
