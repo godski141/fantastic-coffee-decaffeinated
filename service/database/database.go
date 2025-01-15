@@ -61,7 +61,9 @@ type AppDatabase interface {
     MessageExists(messageID string) (bool, error)
     DeleteMessage(messageID string) error
     GetLastMessageID(convID string) (string, error)
-    InsertReaction(messageID string, userID string, reaction string) error 
+    InsertReaction(messageID string, userID string, reaction string) error
+    DeleteReaction(messageID, userID string) error
+    UserHasReaction(messageID, userID string) (bool, error)
 
 	Ping() error
 }

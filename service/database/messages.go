@@ -145,3 +145,34 @@ func (db *appdbimpl) InsertReaction(userID string, messageID string, reaction st
 
     return err
 }
+
+// DeleteReaction elimina una reazione a un messaggio dal database
+func (db *appdbimpl) DeleteReaction(messageID, userID string) error {
+    // Elimina la reazione dell'utente per il messaggio specifico
+    _, err := db.c.Exec(
+        "DELETE FROM reactions WHERE message_id = ? AND user_id = ?",
+        messageID, userID,
+    )
+    if err != nil {
+        return err
+    }
+
+    // Diminuisce il contatore delle reazioni nel messaggio
+    _, err = db.c.Exec(
+        "UPDATE messages SET reaction_count = reaction_count - 1 WHERE id = ? AND reaction_count > 0",
+        messageID,
+    )
+
+    return err
+}
+
+// UserHasReaction controlla se un utente ha reagito a un messaggio
+func (db *appdbimpl) UserHasReaction(messageID, userID string) (bool, error) {
+    var exists bool
+    err := db.c.QueryRow(
+        "SELECT EXISTS(SELECT 1 FROM reactions WHERE message_id = ? AND user_id = ?)",
+        messageID, userID,
+    ).Scan(&exists)
+    return exists, err
+}
+

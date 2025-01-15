@@ -342,3 +342,66 @@ func (rt *_router) commentMessage(w http.ResponseWriter, r *http.Request, ps htt
     // Invia una risposta vuota
     w.WriteHeader(http.StatusNoContent)
 }
+
+// unCommentMessage handles DELETE /messages/:messageID/uncomment
+func (rt *_router) unCommentMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    // Recupera l'userID dall'header Authorization
+    userID := r.Header.Get("Authorization")
+    if userID == "" {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Controlla se l'utente esiste nel database
+    _, err := rt.db.GetUserByID(userID)
+    if err != nil {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Recupera l'ID del messaggio dalla richiesta
+    messageID := ps.ByName("messageId")
+
+    // Verifica che il messaggio esista
+    message, err := rt.db.GetMessageFromID(messageID)
+    if err != nil {
+        if errors.Is(err, sql.ErrNoRows) {
+            http.Error(w, "Message not found", http.StatusNotFound)
+        } else {
+            http.Error(w, "Error fetching message", http.StatusInternalServerError)
+        }
+        return
+    }
+
+    // Verifica che l'utente sia un membro della conversazione associata al messaggio
+    isMember, err := rt.db.IsUserInConversation(userID, message.ConversationID)
+    if err != nil {
+        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
+        return
+    }
+    if !isMember {
+        http.Error(w, "Forbidden: You are not a member of the message's conversation", http.StatusForbidden)
+        return
+    }
+
+    // Controlla se l'utente ha già reagito al messaggio
+    hasReaction, err := rt.db.UserHasReaction(messageID, userID)
+    if err != nil {
+        http.Error(w, "Error checking reaction", http.StatusInternalServerError)
+        return
+    }
+    if !hasReaction {
+        http.Error(w, "Reaction not found", http.StatusNotFound)
+        return
+    }
+
+    // Elimina la reazione dal database
+    if err := rt.db.DeleteReaction(messageID, userID); err != nil {
+        http.Error(w, "Error deleting reaction", http.StatusInternalServerError)
+        return
+    }
+
+    // Invia una risposta vuota
+    w.WriteHeader(http.StatusNoContent)
+}
+

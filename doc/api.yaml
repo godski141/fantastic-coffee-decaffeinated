@@ -528,13 +528,8 @@ components:
           type: string
           description: The emoji used as a reaction
           example: "👍"
-        messageId:
-          type: string
-          description: The ID of the message to comment on
-          example: "12345"
       required:
         - emoji
-        - messageId
     UserNameUpdate:
       type: object
       properties:
