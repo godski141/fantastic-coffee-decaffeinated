@@ -9,7 +9,7 @@ import (
 )
 
 type ConvIDResponse struct {
-	ID    string `json:"convID"`		
+	ID    string `json:"conversation_id`		
 }
 
 type UsernameRequest struct {
@@ -46,7 +46,7 @@ func (rt *_router) getUserConversations(w http.ResponseWriter, r *http.Request, 
 	json.NewEncoder(w).Encode(conversations)
 }
 
-// Handler per POST /conversations
+// Handler per POST /conversations/start-conversation
 func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 	// Recupera il creatorId dall'header Authorization
@@ -143,22 +143,11 @@ func (rt *_router) getConversationByID(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 
-	// Se la conversazione è privata, cambia il nome e la foto in base all'utente
-    if conversation.Type == "private" {
-        otherUserName, otherUserPhoto, err := rt.db.GetOtherUserDetailsInConversation(convID, userID)
-        if err != nil {
-            http.Error(w, "Error retrieving other user details", http.StatusInternalServerError)
-            return
-        }
-        conversation.Name = otherUserName
-        conversation.Photo = otherUserPhoto
-    }
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(conversation)
 }
 
-// Handler per DELETE /conversations/{convId}
+// Handler per DELETE /conversations/{convId}/delete
 func (rt *_router) deleteConversation(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
     convID := ps.ByName("convId")
 
@@ -210,7 +199,7 @@ func (rt *_router) deleteConversation(w http.ResponseWriter, r *http.Request, ps
         }
     } else {
         // Controlla che l'utente sia il creatore
-        isCreator, err := rt.db.IsUserCreatorOfConversation(userID, convID)
+        isCreator, err := rt.db.IsUserCreatorOfGroup(userID, convID)
         if err != nil {
             log.Println("Error checking conversation creator:", err)
             http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -235,56 +224,5 @@ func (rt *_router) deleteConversation(w http.ResponseWriter, r *http.Request, ps
 }
 
 
-// Handler per GET /conversations/{convId}/messages
-func (rt *_router) getMessagesFromConversation(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-    // Recupera l'userID dall'header Authorization
-    userID := r.Header.Get("Authorization")
-    if userID == "" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
 
-    // Verifica che l'utente esista nel database
-    _, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-
-    // Recupera l'ID della conversazione dalla richiesta
-    conversationID := ps.ByName("convId")
-
-    // Verifica che la conversazione esista
-    exists, err := rt.db.ConversationExists(conversationID)
-    if err != nil {
-        http.Error(w, "Error checking conversation existence", http.StatusInternalServerError)
-        return
-    }
-    if !exists {
-        http.Error(w, "Conversation not found", http.StatusNotFound)
-        return
-    }
-
-    // Verifica che l'utente sia un membro della conversazione
-    isMember, err := rt.db.IsUserInConversation(userID, conversationID)
-    if err != nil {
-        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
-        return
-    }
-    if !isMember {
-        http.Error(w, "Forbidden: You are not a member of this conversation", http.StatusForbidden)
-        return
-    }
-
-    // Recupera tutti i messaggi della conversazione
-    messages, err := rt.db.GetMessagesFromConversation(conversationID)
-    if err != nil {
-        http.Error(w, "Error fetching messages", http.StatusInternalServerError)
-        return
-    }
-
-    // Invia i messaggi come risposta
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(messages)
-}
 

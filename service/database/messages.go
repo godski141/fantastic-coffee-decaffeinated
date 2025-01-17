@@ -235,3 +235,19 @@ func (db *appdbimpl) GetMessagesFromConversation(conversationID string) ([]Messa
     return messageList, nil
 }
 
+// GetContentFromMessageID recupera il contenuto di un messaggio dato il suo ID
+func (db *appdbimpl) GetContentFromMessageID(messageID string) (string, error) {
+    var content string
+    err := db.c.QueryRow(
+        "SELECT content FROM messages WHERE id = ?",
+        messageID,
+    ).Scan(&content)
+
+    if err != nil {
+        return "", err
+    }
+
+    return content, nil
+}
+
+

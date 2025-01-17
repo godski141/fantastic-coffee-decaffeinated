@@ -52,11 +52,10 @@ type AppDatabase interface {
     DeleteConversation(convID string) error
     CreatePrivateConversation(user1 string, user2 string) (string, error)
     IsUserInConversation(userID, convID string) (bool, error)
-    GetOtherUserDetailsInConversation(convID, userID string) (string, string, error)
     ConversationExists(convID string) (bool, error)
     GetMessagesFromConversation(conversationID string) ([]Message, error)
     IsConversationPrivate(convID string) (bool, error)
-    IsUserCreatorOfConversation(userID, convID string) (bool, error)
+    IsUserCreatorOfGroup(userID, convID string) (bool, error)
 	
     InsertMessage(convID string, userID string, text string) (string, error)
     GetMessageFromID(messageID string) (Message, error)
@@ -67,6 +66,7 @@ type AppDatabase interface {
     InsertReaction(messageID string, userID string, reaction string) error
     DeleteReaction(messageID, userID string) error
     UserHasReaction(messageID, userID string) (bool, error)
+    GetContentFromMessageID(messageID string) (string, error)
 
     CreateGroup(name, creatorID string) (string, error)
     AddUserToGroup(groupID, userID string) error
@@ -86,7 +86,7 @@ func New(db *sql.DB) (AppDatabase, error) {
     }
 
     // Check if tables exist. If not, the database is empty, and we need to create the structure
-    tables := []string{"users", "conversations", "messages", "conversation_members", "reactions"}
+    tables := []string{"users", "conversations", "messages", "group_members", "reactions"}
     for _, table := range tables {
         var tableName string
         err := db.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?;`, table).Scan(&tableName)
@@ -107,8 +107,10 @@ func New(db *sql.DB) (AppDatabase, error) {
                     creator_id INTEGER NOT NULL,
 					photo TEXT,
                     lastMessageId INTEGER,
+                    otherUser INTEGER,
                     FOREIGN KEY (creator_id) REFERENCES users(id),
                     FOREIGN KEY (lastMessageId) REFERENCES messages(id) ON DELETE SET NULL
+                    FOREIGN KEY (otherUser) REFERENCES users(id) ON DELETE SET NULL
                 );`
             case "messages":
                 sqlStmt = `CREATE TABLE messages (
@@ -122,12 +124,10 @@ func New(db *sql.DB) (AppDatabase, error) {
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id),
                     FOREIGN KEY (sender_id) REFERENCES users(id)
                 );`
-            case "conversation_members":
-                sqlStmt = `CREATE TABLE conversation_members (
+            case "group_members":
+                sqlStmt = `CREATE TABLE group_members (
                     conversation_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
-                    nickname TEXT,
-                    photo TEXT,
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id),
                     FOREIGN KEY (user_id) REFERENCES users(id),
                     PRIMARY KEY (conversation_id, user_id)

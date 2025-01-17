@@ -14,7 +14,7 @@ type GroupRequest struct {
 	Members []string `json:"members"`
 }
 
-// createGroup handles POST /groups
+// createGroup handles POST /groups/create-group
 func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	
 	// Recupera l'userId dal Authorization Header

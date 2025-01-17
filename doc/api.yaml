@@ -37,9 +37,9 @@ paths:
               schema:
                 type: object
                 properties:
-                  userID:
+                  user_id:
                     type: string
-                    example: "12345"
+                    example: "1"
   /conversations:
     get:
       tags:
@@ -59,6 +59,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Conversation'
+  /conversations/start-conversation:
     post:
       tags:
         - conversations
@@ -76,7 +77,7 @@ paths:
             schema:
               type: object
               required:
-                - userId
+                - user_id
               properties:
                 username:
                   type: string
@@ -89,7 +90,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  convId:
+                  conversation_id:
                     type: string
                     example: "1"
         '201':
@@ -99,14 +100,14 @@ paths:
               schema:
                 type: object
                 properties:
-                  convId:
+                  conversation_id:
                     type: string
                     example: "1"
         '400':
           description: Invalid request
         '404':
           description: User not found
-  /conversations/{convId}:
+  /conversations/{conversation_id}:
     get:
       tags:
         - conversations
@@ -117,7 +118,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-      - $ref: '#/components/parameters/convId'
+      - $ref: '#/components/parameters/conversation_id'
       responses:
         '200':
           description: Details of the conversation
@@ -135,7 +136,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/convId'
+        - $ref: '#/components/parameters/conversation_id'
       responses:
         '204':
           description: Conversation deleted successfully
@@ -143,19 +144,18 @@ paths:
           description: Conversation not found
         '403':
           description: Forbidden
-  /conversations/{convId}/messages:
+  /conversations/{conversation_id}/messages:
     get:
       tags:
-        - conversations
+        - messages
       summary: Get all messages from a conversation
       description: >
         Retrieve all messages from a conversation, ordered by timestamp (oldest first).
-        Messages include the sender, timestamp, and reactions (if any).
       operationId: getMessagesFromConversation
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/convId'
+        - $ref: '#/components/parameters/conversation_id'
       responses:
         '200':
           description: Messages loaded successfully
@@ -175,7 +175,7 @@ paths:
           description: Conversation not found
         '500':
           description: Internal server error
-  /messages:
+  /conversations/{conversation_id}/send-message:
     post:
       tags:
         - messages
@@ -185,25 +185,35 @@ paths:
       operationId: sendMessage
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/conversation_id'
       requestBody:
         description: Message details to send
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NewMessage'
+              type: object
+              properties:
+                content:
+                  type: string
+                  example: "Ciao come stai?"
       responses:
         '201':
           description: Message sent successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Message'
+                type: object
+                properties:
+                  message_id:
+                    type: string
+                    example: "1"
         '400':
           description: Invalid request
         '404':
           description: Conversation not found 
-  /messages/{messageId}:
+  /conversations/{conversation_id}/messages/{message_id}:
     delete:
       tags:
         - messages
@@ -212,7 +222,8 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-      - $ref: '#/components/parameters/messageId'
+      - $ref: '#/components/parameters/conversation_id'
+      - $ref: '#/components/parameters/message_id'
       responses:
         '204':
           description: Message deleted successfully
@@ -224,20 +235,23 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-      - $ref: '#/components/parameters/messageId'
+      - $ref: '#/components/parameters/conversation_id'
+      - $ref: '#/components/parameters/message_id'
       requestBody:
         description: Message forwarding details
         required: true
         content:
           application/json:
             schema:
-              type: string
-              description: The ID of the conversation to forward the message to
-              example: "12345"
+              type: object
+              properties:
+                conversation_id:
+                  type: string
+                  example: "3"
       responses:
         '201':
           description: Message forwarded successfully
-  /messages/{messageId}/comment:
+  /conversations/{conversation_id}/messages/{message_id}/reaction:
     post:
       tags:
         - messages
@@ -246,7 +260,8 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-      - $ref: '#/components/parameters/messageId'
+      - $ref: '#/components/parameters/conversation_id'
+      - $ref: '#/components/parameters/message_id'
       requestBody:
         description: Comment details
         required: true
@@ -257,7 +272,6 @@ paths:
       responses:
         '201':
           description: Comment added successfully
-  /messages/{messageId}/uncomment:
     delete:
       tags:
         - messages
@@ -266,17 +280,12 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: messageId
-          in: path
-          required: true
-          description: The ID of the message to uncomment
-          schema:
-            type: string
+      - $ref: '#/components/parameters/conversation_id'
+      - $ref: '#/components/parameters/message_id'
       responses:
         '204':
           description: Comment removed successfully
-  
-  /groups:
+  /conversations/create-group:
     post:
       tags:
         - groups
@@ -300,12 +309,12 @@ paths:
               schema:
                 type: object
                 properties:
-                  convId:
+                  conversation_id:
                     type: string
                     example: "1"
         '400':
           description: Invalid request
-  /groups/{groupId}/name:
+  /conversations/group/{group_id}/change-name:
     patch:
       tags:
         - groups
@@ -314,7 +323,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-      - $ref: '#/components/parameters/groupId'
+      - $ref: '#/components/parameters/group_id'
       requestBody:
         description: New group name
         required: true
@@ -331,10 +340,10 @@ paths:
           description: Group name updated successfully
         '404':
           description: Group not found
-  /groups/{groupId}/add:
+  /conversations/group/{group_id}/add:
     post:
       parameters:
-      - $ref: '#/components/parameters/groupId'
+      - $ref: '#/components/parameters/group_id'
       tags:
         - groups
       summary: Add a user to a group
@@ -349,13 +358,13 @@ paths:
             schema:
               type: object
               properties:
-                userId:
+                user_name:
                   type: string
-                  example: "12345"
+                  example: "hanni"
       responses:
         '200':
           description: User added to group
-  /groups/{groupId}/leave:
+  /conversations/group/{group_id}/leave:
     post:
       tags:
         - groups
@@ -364,13 +373,13 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-      - $ref: '#/components/parameters/groupId'
+      - $ref: '#/components/parameters/group_id'
       responses:
         '200':
           description: User left the group successfully
         '404':
           description: Group not found
-  /groups/{groupId}/photo:
+  /conversations/group/{group_id}/photo:
     patch:
       tags:
         - groups
@@ -379,7 +388,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-      - $ref: '#/components/parameters/groupId'
+      - $ref: '#/components/parameters/group_id'
       requestBody:
         description: New group photo 
         required: true
@@ -396,7 +405,7 @@ paths:
           description: Group photo updated successfully
         '404':
           description: Group not found
-  /users/username:
+  /user/modify-username:
     patch:
       tags: 
         - users
@@ -410,11 +419,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserNameUpdate'
+              type: object
+              properties:
+                new_name: 
+                  type: string
+                  example: "godski"
       responses:
         '200':
           description: Username updated successfully
-  /users/photo:
+  /user/update-photo:
     patch:
       tags:
         - users
@@ -443,26 +456,26 @@ paths:
     
 components:
   parameters:
-    messageId:
+    message_id:
       schema:
         type: string
-      name: messageId
+      name: message_id
       in: path
       required: true
       description: The ID of the message
       allowEmptyValue: false
-    groupId:
+    group_id:
       schema:
         type: string
-      name: groupId
+      name: group_id
       in: path
       required: true
       description: The ID of the group
       allowEmptyValue: false
-    convId:
+    conversation_id:
       schema:
         type: string
-      name: convId
+      name: conversation_id
       in: path
       required: true
       description: The conversation ID
@@ -486,43 +499,15 @@ components:
       required:
         - name
         - members
-    NewMessage:
-      type: object
-      properties:
-        ConvId:
-          type: string
-          example: "12345"
-        content:
-          type: string
-          example: "Hey how r u?"
-      required:
-        - conversationId
-        - content
-    User:
-      type: object
-      properties:
-        id:
-          type: string
-          example: "12345"
-        name: 
-          type: string
-          example: "Giorgio"
-        pro_pic:
-          type: string
-          format: binary
-        conversations:
-          type: array
-          items:
-            $ref: '#/components/schemas/Conversation'
     Message:
       type: object
       properties:
-        id:
+        message_id:
           type: string
-          example: "12041"
-        senderId:
+          example: "1"
+        sender_id:
           type: string
-          example: "12345"
+          example: "1"
         content:
           type: string
           example: "Hello! today is the 1st of the month"
@@ -541,37 +526,38 @@ components:
           items:
             type: object
             properties:
-              userId:
+              user_id:
                 type: string
                 example: "1"
-              Reaction:
+              reaction:
                 type: string
                 example: "xD"
     Conversation:
       type: object
       properties:
-        id:
+        conversation_id:
           type: string
-          example: "12345"
+          example: "1"
         name:
           type: string
-          example: "username1"
+          example: "Giorgio"
         type:
           type: string
           enum:
             - private
             - group
-          example: "group"
-        creatorId:
+          example: "private"
+        creator_id:
           type: string
-          example: "1234567"
+          example: "1"
         photo:
           type: string
           format: binary
+          example: ""
           nullable: true
-        lastMessage:
+        last_message:
           type: string
-          example: "Hello! today is the 1st of the month"
+          example: "reply to my message!"
           nullable: true
       required:
         - id
@@ -585,12 +571,3 @@ components:
           example: "👍"
       required:
         - emoji
-    UserNameUpdate:
-      type: object
-      properties:
-        newName:
-          type: string
-          description: The new username to set
-          example: "JohnDoe"
-      required:
-        - newName
