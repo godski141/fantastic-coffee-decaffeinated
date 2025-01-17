@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 	"unicode/utf8"
-    "unicode"
+
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -145,6 +145,17 @@ func (rt *_router) deleteMessage(w http.ResponseWriter, r *http.Request, ps http
         return
     }
 
+    // Verifica che l'utente appartenga alla conversazione 
+    isMember, err := rt.db.IsUserInConversation(userID, convID)
+    if err != nil {
+        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
+        return
+    }
+    if !isMember {
+        http.Error(w, "Forbidden: You are not a member of this conversation", http.StatusForbidden)
+        return
+    }
+
     // Verifica che il messaggio esista
     message, err := rt.db.GetMessageFromID(messageID)
     log.Println("DEBUG: message->", message)
@@ -233,6 +244,17 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
         return
     }
 
+    // Verifica che l'utente sia un membro della conversazione
+    isMember, err := rt.db.IsUserInConversation(userID, convID)
+    if err != nil {
+        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
+        return
+    }
+    if !isMember {
+        http.Error(w, "Forbidden: You are not a member of this conversation", http.StatusForbidden)
+        return
+    }
+
     // Verifica che il messaggio esista
     message, err := rt.db.GetMessageFromID(messageID)
     if err != nil {
@@ -247,17 +269,6 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
     // Verifica che il messaggio appartenga alla conversazione
     if message.ConversationID != convID {
         http.Error(w, "Forbidden: Message does not belong to this conversation", http.StatusForbidden)
-        return
-    }
-
-    // Verifica che l'utente sia un membro della conversazione
-    isMember, err := rt.db.IsUserInConversation(userID, message.ConversationID)
-    if err != nil {
-        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
-        return
-    }
-    if !isMember {
-        http.Error(w, "Forbidden: You are not a member of this conversation", http.StatusForbidden)
         return
     }
 
@@ -285,14 +296,14 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
         return
     }
 
-    // Verifica che l'utente sia un membro della conversazione
+    // Verifica che l'utente sia un membro della conversazione di destinazione
     isMember, err = rt.db.IsUserInConversation(userID, req.ID)
     if err != nil {
         http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
         return
     }
     if !isMember {
-        http.Error(w, "Forbidden: You are not a member of this conversation", http.StatusForbidden)
+        http.Error(w, "Forbidden: You are not a member of the target conversation", http.StatusForbidden)
         return
     }
 
@@ -339,7 +350,7 @@ func (rt *_router) commentMessage(w http.ResponseWriter, r *http.Request, ps htt
     }
 
     // Recupera l'ID del messaggio dalla richiesta
-    messageID := ps.ByName("messageId")
+    messageID := ps.ByName("message_id")
 
     // Recupera l'ID della conversazione dalla richiesta
     convID := ps.ByName("conversation_id")
@@ -352,6 +363,17 @@ func (rt *_router) commentMessage(w http.ResponseWriter, r *http.Request, ps htt
     }
     if !exist {
         http.Error(w, "Conversation not found", http.StatusNotFound)
+        return
+    }
+
+    // Verifica che l'utente sia un membro della conversazione associata al messaggio
+    isMember, err := rt.db.IsUserInConversation(userID, convID)
+    if err != nil {
+        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
+        return
+    }
+    if !isMember {
+        http.Error(w, "Forbidden: You are not a member of the message's conversation", http.StatusForbidden)
         return
     }
 
@@ -372,17 +394,6 @@ func (rt *_router) commentMessage(w http.ResponseWriter, r *http.Request, ps htt
         return
     }
 
-    // Verifica che l'utente sia un membro della conversazione associata al messaggio
-    isMember, err := rt.db.IsUserInConversation(userID, message.ConversationID)
-    if err != nil {
-        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
-        return
-    }
-    if !isMember {
-        http.Error(w, "Forbidden: You are not a member of the message's conversation", http.StatusForbidden)
-        return
-    }
-
     // Lettura del body della richiesta
     var req ReactionRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -391,7 +402,7 @@ func (rt *_router) commentMessage(w http.ResponseWriter, r *http.Request, ps htt
     }
 
     // Verifica che il campo reaction sia un emoji
-    if !isEmoji(req.Reaction) {
+    if !isSingleEmoji(req.Reaction) {
         http.Error(w, "Invalid reaction: must be an emoji and not a combination of emojis", http.StatusBadRequest)
     }
     
@@ -423,7 +434,7 @@ func (rt *_router) unCommentMessage(w http.ResponseWriter, r *http.Request, ps h
     }
 
     // Recupera l'ID del messaggio dalla richiesta
-    messageID := ps.ByName("messageId")
+    messageID := ps.ByName("message_id")
 
     // Recupera l'ID della conversazione dalla richiesta
     convID := ps.ByName("conversation_id")
@@ -436,6 +447,17 @@ func (rt *_router) unCommentMessage(w http.ResponseWriter, r *http.Request, ps h
     }
     if !exist {
         http.Error(w, "Conversation not found", http.StatusNotFound)
+        return
+    }
+
+    // Verifica che l'utente sia un membro della conversazione associata al messaggio
+    isMember, err := rt.db.IsUserInConversation(userID, convID)
+    if err != nil {
+        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
+        return
+    }
+    if !isMember {
+        http.Error(w, "Forbidden: You are not a member of the message's conversation", http.StatusForbidden)
         return
     }
 
@@ -453,17 +475,6 @@ func (rt *_router) unCommentMessage(w http.ResponseWriter, r *http.Request, ps h
     // Verifica che il messaggio appartenga alla conversazione
     if message.ConversationID != convID {
         http.Error(w, "Forbidden: Message does not belong to this conversation", http.StatusForbidden)
-        return
-    }
-
-    // Verifica che l'utente sia un membro della conversazione associata al messaggio
-    isMember, err := rt.db.IsUserInConversation(userID, message.ConversationID)
-    if err != nil {
-        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
-        return
-    }
-    if !isMember {
-        http.Error(w, "Forbidden: You are not a member of the message's conversation", http.StatusForbidden)
         return
     }
 
@@ -505,7 +516,7 @@ func (rt *_router) getMessagesFromConversation(w http.ResponseWriter, r *http.Re
     }
 
     // Recupera l'ID della conversazione dalla richiesta
-    conversationID := ps.ByName("convId")
+    conversationID := ps.ByName("conversation_id")
 
     // Verifica che la conversazione esista
     exists, err := rt.db.ConversationExists(conversationID)
@@ -541,15 +552,21 @@ func (rt *_router) getMessagesFromConversation(w http.ResponseWriter, r *http.Re
     json.NewEncoder(w).Encode(messages)
 }
 
-func isEmoji(input string) bool {
-    // Verifica che la lunghezza sia corretta
-    if len(input) > 3 || len(input) == 0 {
-        return false
-    }
+// isSingleEmoji verifica se una stringa è un singolo emoji
+func isSingleEmoji(input string) bool {
+	// Decodifica il primo carattere Unicode
+	r, size := utf8.DecodeRuneInString(input)
 
-    // Decodifica il primo carattere Unicode
-    r, _ := utf8.DecodeRuneInString(input)
+	// Verifica che il carattere sia valido e che la lunghezza totale della stringa corrisponda
+	return r != utf8.RuneError && size == len(input) && isEmojiRune(r)
+}
 
-    // Controlla se il carattere è un'emoji
-    return unicode.Is(unicode.S, r) || unicode.Is(unicode.So, r)
+// isEmojiRune verifica se un carattere è una emoji valida
+func isEmojiRune(r rune) bool {
+	// Intervalli Unicode per le emoji
+	return (r >= 0x1F600 && r <= 0x1F64F) || // Emoticon
+		(r >= 0x1F300 && r <= 0x1F5FF) || // Simboli e pittogrammi
+		(r >= 0x1F680 && r <= 0x1F6FF) || // Trasporti e simboli
+		(r >= 0x2600 && r <= 0x26FF) ||   // Simboli vari
+		(r >= 0x2700 && r <= 0x27BF)      // Dingbats
 }

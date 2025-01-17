@@ -48,7 +48,7 @@ type AppDatabase interface {
     
 
     GetUserConversations(userID string) ([]Conversation, error)
-    GetConversationByID(convID string) (Conversation, error)
+    GetConversationByID(convID, userID string) (Conversation, error)
     DeleteConversation(convID string) error
     CreatePrivateConversation(user1 string, user2 string) (string, error)
     IsUserInConversation(userID, convID string) (bool, error)
@@ -84,6 +84,12 @@ func New(db *sql.DB) (AppDatabase, error) {
     if db == nil {
         return nil, errors.New("database is required when building a AppDatabase")
     }
+    
+    // Enable foreign keys
+	_, err := db.Exec("PRAGMA foreign_keys = ON;")
+	if err != nil {
+		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
+	}
 
     // Check if tables exist. If not, the database is empty, and we need to create the structure
     tables := []string{"users", "conversations", "messages", "group_members", "reactions"}
@@ -102,14 +108,14 @@ func New(db *sql.DB) (AppDatabase, error) {
             case "conversations":
                 sqlStmt = `CREATE TABLE conversations (
                     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
+                    name TEXT,
                     type TEXT CHECK(type IN ('private', 'group')) NOT NULL,
                     creator_id INTEGER NOT NULL,
 					photo TEXT,
                     lastMessageId INTEGER,
                     otherUser INTEGER,
                     FOREIGN KEY (creator_id) REFERENCES users(id),
-                    FOREIGN KEY (lastMessageId) REFERENCES messages(id) ON DELETE SET NULL
+                    FOREIGN KEY (lastMessageId) REFERENCES messages(id) ON DELETE SET NULL,
                     FOREIGN KEY (otherUser) REFERENCES users(id) ON DELETE SET NULL
                 );`
             case "messages":
@@ -121,15 +127,15 @@ func New(db *sql.DB) (AppDatabase, error) {
                     reaction_count INTEGER DEFAULT 0,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                     status TEXT CHECK(status IN ('sent', 'received', 'read')) NOT NULL,
-                    FOREIGN KEY (conversation_id) REFERENCES conversations(id),
+                    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
                     FOREIGN KEY (sender_id) REFERENCES users(id)
                 );`
             case "group_members":
                 sqlStmt = `CREATE TABLE group_members (
                     conversation_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
-                    FOREIGN KEY (conversation_id) REFERENCES conversations(id),
-                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                     PRIMARY KEY (conversation_id, user_id)
                 );`
             case "reactions":
@@ -138,7 +144,7 @@ func New(db *sql.DB) (AppDatabase, error) {
                     user_id INTEGER NOT NULL,
                     reaction TEXT NOT NULL,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (message_id, user_id),  -- Un utente può reagire una sola volta per messaggio
+                    PRIMARY KEY (message_id, user_id), 
                     FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 );`

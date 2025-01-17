@@ -53,10 +53,11 @@ func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprou
 	// Controllo se gli utenti esistono nel database
 	var invalidMembers []string
 	for _, memberName := range req.Members {
-		_, err := rt.db.GetUserByName(memberName)
+		
+		_, err := rt.db.GetUserByName(strings.ToLower(memberName))
 		if err != nil {
 			log.Println(err)
-			invalidMembers = append(invalidMembers, memberName)
+			invalidMembers = append(invalidMembers, strings.ToLower(memberName))
 		}
 	}
 	if len(invalidMembers) > 0 {
@@ -81,7 +82,7 @@ func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprou
 
 	// Aggiungo i membri al gruppo
 	for _, memberName := range req.Members {
-		memberId, _ := rt.db.GetUserByName(memberName)
+		memberId, _ := rt.db.GetUserByName(strings.ToLower(memberName))
 		if err := rt.db.AddUserToGroup(groupId, memberId); err != nil {
 			rt.db.DeleteConversation(groupId)
 			http.Error(w, "Error adding members to group", http.StatusInternalServerError)
@@ -89,7 +90,7 @@ func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprou
 		}
 	}
 	
-	res := ConvIDResponse{ID: groupId}
+	res := ConvIDResponse{ConversationID: groupId}
 
 	// Risposta
 	w.Header().Set("Content-Type", "application/json")

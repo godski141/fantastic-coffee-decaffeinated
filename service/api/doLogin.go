@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -11,7 +13,7 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-    Identifier string `json:"userID"`
+    Identifier string `json:"user_id"`
 }
 
 
@@ -30,13 +32,13 @@ func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.
         http.Error(w, "Name cannot be empty", http.StatusBadRequest)
         return
     }
-
+    lowername := strings.ToLower(req.Name)
     // Controlla se l'utente esiste nel database
-    id, err := rt.db.GetUserByName(req.Name)
+    id, err := rt.db.GetUserByName(lowername)
     if err != nil {
 
         // Se l'utente non esiste, crea un nuovo utente
-        id, err = rt.db.CreateUser(req.Name)
+        id, err = rt.db.CreateUser(lowername)
         if err != nil {
 
             // Se c'è un errore nella creazione dell'utente, ritorna errore

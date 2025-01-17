@@ -34,6 +34,7 @@ func (db *appdbimpl) GetMessageFromID(messageID string) (Message, error) {
 		messageID,
 	).Scan(&message.MessageID, &message.ConversationID, &message.SenderID, &message.Content, &message.Timestamp, &message.Status)
 	
+    message.Reactions = []Reaction{}
 	if err != nil {
 		return Message{}, err
 	}
@@ -81,11 +82,12 @@ func (db *appdbimpl) GetSenderIDFromMessageID(messageID string) (string, error) 
 
 // DeleteMessage elimina un messaggio dal database
 func (db *appdbimpl) DeleteMessage(messageID string) error {
-	_, err := db.c.Exec(
-		"DELETE FROM messages WHERE id = ?",
-		messageID,
-	)
-	return err
+    // Elimina il messaggio dal database
+    _, err := db.c.Exec(
+        "DELETE FROM messages WHERE id = ?",
+        messageID,
+    )
+    return err
 }
 
 // GetLastMessageID recupera l'ID dell'ultimo messaggio di una conversazione

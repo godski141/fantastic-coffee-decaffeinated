@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/julienschmidt/httprouter"
 )
 
 type ConvIDResponse struct {
-	ID    string `json:"conversation_id`		
+    ConversationID string `json:"conversation_id"`
 }
 
 type UsernameRequest struct {
@@ -52,6 +53,10 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 	// Recupera il creatorId dall'header Authorization
 	creatorID := r.Header.Get("Authorization")
 
+
+    log.Println("DEBUG: creatorID:", creatorID)
+
+
 	// Verifica che il creatorID non sia vuoto
 	if creatorID == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -65,7 +70,7 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
     if err != nil {
         http.Error(w, "Unauthorized", http.StatusUnauthorized)
         return
-    }
+    } 
 
 	// Decodifica il requestBody
 	var req UsernameRequest
@@ -80,8 +85,13 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
         return
     }
 
+    log.Println("DEBUG: Nome username target: ", req.Username)
+
+    // Converte il nome dell'utente in minuscolo
+    lowername := strings.ToLower(req.Username)
+
 	// Recupera l'ID dell'utente dal database
-	targetUserID, err := rt.db.GetUserByName(req.Username)
+	targetUserID, err := rt.db.GetUserByName(lowername)
 
 	// Se l'utente non esiste, ritorna errore
 	if err!= nil {
@@ -92,6 +102,10 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 	// Creazione della conversazione nel database
 	convID, err := rt.db.CreatePrivateConversation(creatorID, targetUserID)
 
+
+    log.Println("DEBUG: ID della conversazione appena creata:", convID)
+
+
 	// Se la creazione fallisce, ritorna errore
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -99,7 +113,7 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 	}
 
 	// Invia l'ID della conversazione come risposta
-	res := ConvIDResponse{ID : convID}
+	res := ConvIDResponse{ConversationID : convID}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(res)
 }
@@ -107,7 +121,7 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 // Handler per GET /conversations/{convId}
 func (rt *_router) getConversationByID(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
-	convID := ps.ByName("convId")
+	convID := ps.ByName("conversation_id")
 
 	exists, err := rt.db.ConversationExists(convID)
     if err != nil {
@@ -137,7 +151,8 @@ func (rt *_router) getConversationByID(w http.ResponseWriter, r *http.Request, p
         return
     }
 
-	conversation, err := rt.db.GetConversationByID(convID)
+	conversation, err := rt.db.GetConversationByID(convID, userID)
+    log.Println("DEBUG: error:", err)
 	if err != nil {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
 		return
@@ -149,7 +164,7 @@ func (rt *_router) getConversationByID(w http.ResponseWriter, r *http.Request, p
 
 // Handler per DELETE /conversations/{convId}/delete
 func (rt *_router) deleteConversation(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-    convID := ps.ByName("convId")
+    convID := ps.ByName("conversation_id")
 
     // Recupera l'ID dell'utente autenticato
     userID := r.Header.Get("Authorization")
