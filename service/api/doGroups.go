@@ -127,8 +127,12 @@ func (rt *_router) renameGroup(w http.ResponseWriter, r *http.Request, ps httpro
 	groupID := ps.ByName("conversation_id")
 
 	// Controllo se il gruppo esiste
-	_, err = rt.db.ConversationExists(groupID)
+	exist , err := rt.db.ConversationExists(groupID)
 	if err != nil {
+		http.Error(w, "Error", http.StatusNotFound)
+		return
+	}
+	if !exist {
 		http.Error(w, "Group not found", http.StatusNotFound)
 		return
 	}
@@ -207,8 +211,12 @@ func (rt *_router) addToGroup(w http.ResponseWriter, r *http.Request, ps httprou
 	groupID := ps.ByName("conversation_id")
 
 	// Controllo se il gruppo esiste
-	_, err = rt.db.ConversationExists(groupID)
+	exist , err := rt.db.ConversationExists(groupID)
 	if err != nil {
+		http.Error(w, "Error", http.StatusNotFound)
+		return
+	}
+	if !exist {
 		http.Error(w, "Group not found", http.StatusNotFound)
 		return
 	}
@@ -244,9 +252,9 @@ func (rt *_router) addToGroup(w http.ResponseWriter, r *http.Request, ps httprou
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-
+	lowerUsername := strings.ToLower(req.Username)
 	// Controllo se l'utente esiste nel database
-	user2ID , err := rt.db.GetUserByName(req.Username)
+	user2ID , err := rt.db.GetUserByName(lowerUsername)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
@@ -295,8 +303,12 @@ func (rt *_router) leaveGroup(w http.ResponseWriter, r *http.Request, ps httprou
 	groupID := ps.ByName("conversation_id")
 
 	// Controllo se il gruppo esiste
-	_, err = rt.db.ConversationExists(groupID)
+	exist , err := rt.db.ConversationExists(groupID)
 	if err != nil {
+		http.Error(w, "Error", http.StatusNotFound)
+		return
+	}
+	if !exist {
 		http.Error(w, "Group not found", http.StatusNotFound)
 		return
 	}
@@ -408,8 +420,9 @@ func (rt *_router) updateGroupPhoto(w http.ResponseWriter, r *http.Request, ps h
         return
     }
 
-    // Rimuovi il prefisso se presente
+	// Rimuovi l'intestazione "data:image/png;base64," o "data:image/jpeg;base64,"
     photoData := strings.TrimPrefix(req.PhotoBase64, "data:image/png;base64,")
+    photoData = strings.TrimPrefix(photoData, "data:image/jpeg;base64,")
 
     // Decodifica l'immagine Base64
     decodedPhoto, err := base64.StdEncoding.DecodeString(photoData)
@@ -418,13 +431,26 @@ func (rt *_router) updateGroupPhoto(w http.ResponseWriter, r *http.Request, ps h
         return
     }
 
-    // Salva l'immagine sul server ATTENTO A DOVE SALVI
-    filePath := fmt.Sprintf("WasaTEXT/service/uploads/groups/%s_photo.png", groupID)
-    err = os.WriteFile(filePath, decodedPhoto, 0644)
-    if err != nil {
-        http.Error(w, "Failed to save image", http.StatusInternalServerError)
-        return
-    }
+    // Percorso per la directory e il file
+	dirPath := "service/uploads/groups/"
+	filePath := fmt.Sprintf("%s%s_photo.png", dirPath, groupID)
+
+	// Assicurati che la directory esista
+	err = os.MkdirAll(dirPath, os.ModePerm)
+	if err != nil {
+		log.Println("Failed to create directory:", err)
+		http.Error(w, "Failed to create directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Salva l'immagine nel file
+	err = os.WriteFile(filePath, decodedPhoto, 0644)
+	if err != nil {
+		log.Println("Failed to save image:", err)
+		http.Error(w, "Failed to save image", http.StatusInternalServerError)
+		return
+	}
+
 
     // Aggiorna il percorso della foto nel database
     err = rt.db.UpdateGroupPhoto(groupID, filePath)
@@ -439,8 +465,23 @@ func (rt *_router) updateGroupPhoto(w http.ResponseWriter, r *http.Request, ps h
 
 // getGroupPhoto handles GET conversations/groups/photo/:conversation_id
 func (rt *_router) getGroupPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	// Recupera l'userId dal Authorization Header
+	userID := r.Header.Get("Authorization")
+	if userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Controllo se l'utente esiste nel database
+	_, err := rt.db.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
     // Recupera l'ID della conversazione
     conversationID := ps.ByName("conversation_id")
+
 
     // Verifica che la conversazione esista e sia di tipo "group"
 	isPrivate, err := rt.db.IsConversationPrivate(conversationID)
@@ -450,6 +491,17 @@ func (rt *_router) getGroupPhoto(w http.ResponseWriter, r *http.Request, ps http
 	}
 	if isPrivate {
 		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+
+	// Verifica che l'utente faccia parte del gruppo
+	isMember, err := rt.db.IsUserInConversation(userID, conversationID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !isMember {
+		http.Error(w, "Forbidden: You are not a member of this group", http.StatusForbidden)
 		return
 	}
 
@@ -467,7 +519,7 @@ func (rt *_router) getGroupPhoto(w http.ResponseWriter, r *http.Request, ps http
 
     // Usa una foto predefinita se il campo photo è NULL o vuoto
 	if photoPath == "" {
-		photoPath = "uploads/default_group_photo.png"
+		photoPath = "service/uploads/default_user_photo.jpg"
 	}
 
     // Serve il file immagine

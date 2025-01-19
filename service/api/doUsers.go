@@ -22,6 +22,13 @@ func (rt *_router) getUserPhoto(w http.ResponseWriter, r *http.Request, ps httpr
     // Recupera l'userId dai parametri
     userID := ps.ByName("user_id")
 
+    // Controllo se l'utente esiste nel database
+    _, err := rt.db.GetUserByID(userID)
+    if err != nil {
+        http.Error(w, "User not found", http.StatusNotFound)
+        return
+    }
+
     // Recupera il percorso della foto dal database
     photoPath, err := rt.db.GetUserPhotoByID(userID)
     if err != nil {
@@ -32,10 +39,9 @@ func (rt *_router) getUserPhoto(w http.ResponseWriter, r *http.Request, ps httpr
         http.Error(w, "Internal server error", http.StatusInternalServerError)
         return
     }
-
     // Se la foto non è impostata, restituisci una foto predefinita
     if photoPath == "" {
-        photoPath = "uploads/default_user_photo.png" // Percorso della foto predefinita
+        photoPath = "service/uploads/default_user_photo.jpg" // Percorso della foto predefinita
     }
 
     // Serve il file immagine
@@ -77,15 +83,16 @@ func (rt *_router) modifyUserName(w http.ResponseWriter, r *http.Request, _ http
         return
     }
 
+    lowername := strings.ToLower(req.Name)
     // Verifico che il nome non esista già
-    _, err = rt.db.GetUserByName(req.Name)
+    _, err = rt.db.GetUserByName(lowername)
     if err == nil {
         http.Error(w, "Name already exists", http.StatusBadRequest)
         return
     }
 
     // Modifica il nome dell'utente
-    err = rt.db.ModifyUserName(userID, req.Name)
+    err = rt.db.ModifyUserName(userID, lowername)
     if err != nil {
         http.Error(w, "Internal server error", http.StatusInternalServerError)
         return
@@ -127,8 +134,9 @@ func (rt *_router) updateUserPhoto(w http.ResponseWriter, r *http.Request, _ htt
         return
     }
 
-    // Rimuovi il prefisso se presente
+    // Rimuovi il prefisso se presente tra PNG e JPEG
     photoData := strings.TrimPrefix(req.PhotoBase64, "data:image/png;base64,")
+    photoData = strings.TrimPrefix(photoData, "data:image/jpeg;base64,")
 
     // Decodifica l'immagine Base64
     decodedPhoto, err := base64.StdEncoding.DecodeString(photoData)
@@ -137,15 +145,26 @@ func (rt *_router) updateUserPhoto(w http.ResponseWriter, r *http.Request, _ htt
         return
     }
 
-    photoPath := fmt.Sprintf("WasaTEXT/service/uploads/users/%s_photo.png", userID)
-    err = os.WriteFile(photoPath, decodedPhoto, 0644)
-    if err != nil {
-        http.Error(w, "Failed to save image", http.StatusInternalServerError)
-        return
-    }
+    // Percorso per la directory e il file
+	dirPath := "service/uploads/users/"
+	filePath := fmt.Sprintf("%s%s_photo.png", dirPath, userID)
+
+	// Assicurati che la directory esista
+	err = os.MkdirAll(dirPath, os.ModePerm)
+	if err != nil {
+		http.Error(w, "Failed to create directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Salva l'immagine nel file
+	err = os.WriteFile(filePath, decodedPhoto, 0644)
+	if err != nil {
+		http.Error(w, "Failed to save image", http.StatusInternalServerError)
+		return
+	}
 
     // Aggiorna il percorso della foto nel database
-    err = rt.db.UpdateUserPhoto(userID, photoPath)
+    err = rt.db.UpdateUserPhoto(userID, filePath)
     if err != nil {
         http.Error(w, "Internal server error", http.StatusInternalServerError)
         return

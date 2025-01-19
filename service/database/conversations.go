@@ -68,19 +68,19 @@ func (db *appdbimpl) GetConversationByID(convID, userID string) (Conversation, e
                 return conv, err
             }
             conv.Name = otherUserName
-            conv.Photo = fmt.Sprintf("/users/%s/photo", otherUser.String) // Endpoint foto utente
+            conv.Photo = fmt.Sprintf("/users/get-photo/%s", otherUser.String) // Endpoint foto utente
         } else {
             creatorName, err := db.GetUserByID(conv.CreatorID)
             if err != nil {
                 return conv, err
             }
             conv.Name = creatorName
-            conv.Photo = fmt.Sprintf("/users/%s/photo", conv.CreatorID) // Endpoint foto utente
+            conv.Photo = fmt.Sprintf("/users/get-photo/%s", conv.CreatorID) // Endpoint foto utente
         }
     } else {
         // Se la conversazione è di gruppo, usa il nome e l'endpoint della foto della conversazione
         conv.Name = name.String
-        conv.Photo = fmt.Sprintf("/group/%s/photo", convID)
+        conv.Photo = fmt.Sprintf("/conversations/group/get-photo/%s", convID)
     }
 
     // Recupera l'ultimo messaggio della conversazione
@@ -219,12 +219,7 @@ func (db *appdbimpl) ConversationExists(convID string) (bool, error) {
             SELECT 1 FROM conversations WHERE id = ?
         )
     `, convID).Scan(&exists)
-
-    if err != nil {
-        return false, err
-    }
-
-    return exists, nil
+    return exists, err
 }
 
 // isConversationPrivate verifica se una conversazione è di tipo privato

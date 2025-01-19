@@ -395,13 +395,13 @@ paths:
         description: New group photo 
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
               properties:
-                file:
+                photo:
                   type: string
-                  format: binary
+                  example: "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABjElEQVRIS+2Vv0oDQRSGv7V"
       responses:
         '200':
           description: Group photo updated successfully

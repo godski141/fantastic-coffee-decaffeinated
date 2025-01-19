@@ -32,6 +32,13 @@ func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.
         http.Error(w, "Name cannot be empty", http.StatusBadRequest)
         return
     }
+
+    // Verifica che il nome sia tra 3 e 50 caratteri
+    if len(req.Name) < 3 || len(req.Name) > 50 {
+        http.Error(w, "Name must be between 3 and 50 characters", http.StatusBadRequest)
+        return
+    }
+
     lowername := strings.ToLower(req.Name)
     // Controlla se l'utente esiste nel database
     id, err := rt.db.GetUserByName(lowername)

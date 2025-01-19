@@ -40,6 +40,7 @@ func (rt *_router) Handler() http.Handler {
 
 	rt.router.PATCH("/users/modify-username", rt.modifyUserName)
 	rt.router.GET("/users/get-photo/:user_id", rt.getUserPhoto)
+	rt.router.PATCH("/users/update-photo", rt.updateUserPhoto)
 	
 	return rt.router
 }

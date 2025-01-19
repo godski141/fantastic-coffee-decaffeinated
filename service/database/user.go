@@ -23,15 +23,15 @@ func (db *appdbimpl) GetUserByID(id string) (string, error) {
 // GetPhotoByID restituisce la foto dell'utente con l'id specificato
 func (db *appdbimpl) GetUserPhotoByID(id string) (string, error) {
     var photo sql.NullString
-	err2 := db.c.QueryRow("SELECT photo FROM users WHERE id = ? ", id).Scan(&photo)
-	if err2 != nil {
-		return "", err2
-	}
-	if photo.Valid {
-		return photo.String, nil
-	} else {
-		return "", nil
-	}
+	err := db.c.QueryRow("SELECT photo FROM users WHERE id = ? ", id).Scan(&photo)
+	if err != nil {
+        return "", err
+    }
+    if photo.String == "" {
+        return "", nil
+    }
+    
+    return photo.String, nil
 }
 
 // GetUserByName restituisce l'id dell'utente con il nome specificato
