@@ -32,6 +32,14 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.DELETE("/conversations/delete-react/:conversation_id/messages/:message_id", rt.unCommentMessage)
 	
 	rt.router.POST("/conversations/create-group", rt.createGroup)
+	rt.router.PATCH("/conversations/group/change-name/:conversation_id", rt.renameGroup)
+	rt.router.POST("/conversations/group/add/:conversation_id", rt.addToGroup)
+	rt.router.DELETE("/conversations/group/leave/:conversation_id", rt.leaveGroup)
+	rt.router.PATCH("/conversations/group/change-photo/:conversation_id", rt.updateGroupPhoto)
+	rt.router.GET("/conversations/group/get-photo/:conversation_id", rt.getGroupPhoto)
+
+	rt.router.PATCH("/users/modify-username", rt.modifyUserName)
+	rt.router.GET("/users/get-photo/:user_id", rt.getUserPhoto)
 	
 	return rt.router
 }

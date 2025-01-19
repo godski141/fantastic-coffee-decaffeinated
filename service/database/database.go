@@ -43,9 +43,10 @@ type AppDatabase interface {
 
 	CreateUser(name string) (string, error)
 	GetUserByID(id string) (string, error)
-    GetPhotoByID(id string) (string, error)
+    GetUserPhotoByID(id string) (string, error)
 	GetUserByName(name string) (string, error)
-    
+    ModifyUserName(id string, name string) error
+    UpdateUserPhoto(id string, photoPath string) error
 
     GetUserConversations(userID string) ([]Conversation, error)
     GetConversationByID(convID, userID string) (Conversation, error)
@@ -70,6 +71,10 @@ type AppDatabase interface {
 
     CreateGroup(name, creatorID string) (string, error)
     AddUserToGroup(groupID, userID string) error
+    ChangeGroupName(groupID, name string) error
+    LeaveGroup(groupID, userID string) error
+    GetGroupPhotoByID(groupID string) (string, error)
+    UpdateGroupPhoto(groupID, photoPath string) error
 
 	Ping() error
 }

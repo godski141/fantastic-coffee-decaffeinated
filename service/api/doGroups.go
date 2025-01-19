@@ -1,9 +1,14 @@
 package api
 
 import (
+	"database/sql"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
@@ -12,6 +17,10 @@ import (
 type GroupRequest struct {
 	Name string `json:"name"`
 	Members []string `json:"members"`
+}
+
+type NewGroupName struct {
+	Name string `json:"name"`
 }
 
 // createGroup handles POST /groups/create-group
@@ -96,4 +105,371 @@ func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprou
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(res)
+}
+
+// renameGroup handles PATCH conversations/groups/change-name/:groupId
+func (rt *_router) renameGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	// Recupera l'userId dal Authorization Header
+	userID := r.Header.Get("Authorization")
+	if userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Controllo se l'utente esiste nel database
+	_, err := rt.db.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Recupera il groupId dai parametri
+	groupID := ps.ByName("conversation_id")
+
+	// Controllo se il gruppo esiste
+	_, err = rt.db.ConversationExists(groupID)
+	if err != nil {
+		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+
+	// Se esiste, controllo se è un gruppo
+	isPrivate, err := rt.db.IsConversationPrivate(groupID)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	if isPrivate {
+		http.Error(w, "Conversation is not a group", http.StatusBadRequest)
+		return
+	}
+
+	// Controllo se l'utente è il creatore del gruppo
+	isCreator, err := rt.db.IsUserCreatorOfGroup(userID, groupID)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if !isCreator {
+		http.Error(w, "Forbidden: You are not the creator of this group", http.StatusForbidden)
+		return
+	}
+
+
+	// Decodifica il body della richiesta
+	var req NewGroupName
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Controllo se il nome del gruppo è vuoto
+	if req.Name == "" {
+		http.Error(w, "Invalid group name", http.StatusBadRequest)
+		return
+	}
+
+	// Controllo se il nome del gruppo è valido
+	if len(req.Name) < 3 || len(req.Name) > 50 {
+		http.Error(w, "Group name must be between 3 and 50 characters", http.StatusBadRequest)
+		return
+	}
+
+	// Cambio il nome del gruppo
+	err = rt.db.ChangeGroupName(groupID, req.Name)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	// Risposta
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// addToGroup handles POST conversations/groups/add-user/:groupId
+func (rt *_router) addToGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	// Recupera l'userId dal Authorization Header
+	userID := r.Header.Get("Authorization")
+	if userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Controllo se l'utente esiste nel database
+	_, err := rt.db.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Recupera il groupId dai parametri
+	groupID := ps.ByName("conversation_id")
+
+	// Controllo se il gruppo esiste
+	_, err = rt.db.ConversationExists(groupID)
+	if err != nil {
+		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+
+	// Se esiste, controllo se è un gruppo
+	isPrivate, err := rt.db.IsConversationPrivate(groupID)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	if isPrivate {
+		http.Error(w, "Conversation is not a group", http.StatusBadRequest)
+		return
+	}
+
+	// Controllo se l'utente è nel gruppo
+	isMember, err := rt.db.IsUserInConversation(userID, groupID)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	if !isMember {
+		http.Error(w, "Who is trying to add, is not in the selected group", http.StatusBadRequest)
+		return
+	}
+
+	// Decodifica il body della richiesta
+	var req struct {
+		Username string `json:"username"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Controllo se l'utente esiste nel database
+	user2ID , err := rt.db.GetUserByName(req.Username)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Controllo se l'utente è già nel gruppo
+	isMember, err = rt.db.IsUserInConversation(user2ID, groupID)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	if isMember {
+		http.Error(w, "User is already in the group", http.StatusBadRequest)
+		return
+	}
+
+	// Aggiungo l'utente al gruppo
+	err = rt.db.AddUserToGroup(groupID, user2ID)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	// Risposta
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// leaveGroup handles DELETE conversations/groups/leave/:groupId
+func (rt *_router) leaveGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+
+	// Recupera l'userId dal Authorization Header
+	userID := r.Header.Get("Authorization")
+	if userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Controllo se l'utente esiste nel database
+	_, err := rt.db.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Recupera il groupId dai parametri
+	groupID := ps.ByName("conversation_id")
+
+	// Controllo se il gruppo esiste
+	_, err = rt.db.ConversationExists(groupID)
+	if err != nil {
+		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+
+	// Se esiste, controllo se è un gruppo
+	isPrivate, err := rt.db.IsConversationPrivate(groupID)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	if isPrivate {
+		http.Error(w, "Conversation is not a group", http.StatusBadRequest)
+		return
+	}
+
+	// Controllo se l'utente è nel gruppo
+	isMember, err := rt.db.IsUserInConversation(userID, groupID)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	if !isMember {
+		http.Error(w, "User is not in the group", http.StatusBadRequest)
+		return
+	}
+
+	// Controllo se l'utente è il creatore del gruppo
+	isCreator, err := rt.db.IsUserCreatorOfGroup(userID, groupID)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	if isCreator {
+		http.Error(w, "Forbidden: Creator cannot leave the group", http.StatusForbidden)
+		return
+	}
+
+	// Tolgo l'utente dal gruppo
+	err = rt.db.LeaveGroup(groupID, userID)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	// Risposta
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// updatePhotoGroup handles PATCH conversations/groups/update-photo/:groupId 
+func (rt *_router) updateGroupPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    // Recupera l'userId dal Authorization Header
+    userID := r.Header.Get("Authorization")
+    if userID == "" {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Controllo se l'utente esiste nel database
+    _, err := rt.db.GetUserByID(userID)
+    if err != nil {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Recupera il groupId dai parametri
+    groupID := ps.ByName("conversation_id")
+
+    // Controlla se il gruppo esiste
+    exists, err := rt.db.ConversationExists(groupID)
+    if err != nil || !exists {
+        http.Error(w, "Group not found", http.StatusNotFound)
+        return
+    }
+
+	// Controlla se il gruppo è di tipo "group"
+	isPrivate, err := rt.db.IsConversationPrivate(groupID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if isPrivate {
+		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+
+    // Controlla se l'utente fa parte del gruppo
+	isMember, err := rt.db.IsUserInConversation(userID, groupID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !isMember {
+		http.Error(w, "Forbidden: You are not a member of this group", http.StatusForbidden)
+		return
+	}
+
+    // Decodifica il body della richiesta
+    var req struct {
+        PhotoBase64 string `json:"photo"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "Invalid request body", http.StatusBadRequest)
+        return
+    }
+
+    // Verifica che la foto non sia vuota
+    if req.PhotoBase64 == "" {
+        http.Error(w, "Photo cannot be empty", http.StatusBadRequest)
+        return
+    }
+
+    // Rimuovi il prefisso se presente
+    photoData := strings.TrimPrefix(req.PhotoBase64, "data:image/png;base64,")
+
+    // Decodifica l'immagine Base64
+    decodedPhoto, err := base64.StdEncoding.DecodeString(photoData)
+    if err != nil {
+        http.Error(w, "Invalid Base64 string", http.StatusBadRequest)
+        return
+    }
+
+    // Salva l'immagine sul server ATTENTO A DOVE SALVI
+    filePath := fmt.Sprintf("WasaTEXT/service/uploads/groups/%s_photo.png", groupID)
+    err = os.WriteFile(filePath, decodedPhoto, 0644)
+    if err != nil {
+        http.Error(w, "Failed to save image", http.StatusInternalServerError)
+        return
+    }
+
+    // Aggiorna il percorso della foto nel database
+    err = rt.db.UpdateGroupPhoto(groupID, filePath)
+    if err != nil {
+        http.Error(w, "Internal error", http.StatusInternalServerError)
+        return
+    }
+
+    // Rispondi con successo
+    w.WriteHeader(http.StatusNoContent)
+}
+
+// getGroupPhoto handles GET conversations/groups/photo/:conversation_id
+func (rt *_router) getGroupPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    // Recupera l'ID della conversazione
+    conversationID := ps.ByName("conversation_id")
+
+    // Verifica che la conversazione esista e sia di tipo "group"
+	isPrivate, err := rt.db.IsConversationPrivate(conversationID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if isPrivate {
+		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+
+	// Recupera il percorso della foto dal database
+	photoPath, err := rt.db.GetGroupPhotoByID(conversationID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Group not found or photo not set", http.StatusNotFound)
+			return
+		} else {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+    // Usa una foto predefinita se il campo photo è NULL o vuoto
+	if photoPath == "" {
+		photoPath = "uploads/default_group_photo.png"
+	}
+
+    // Serve il file immagine
+    http.ServeFile(w, r, photoPath)
 }

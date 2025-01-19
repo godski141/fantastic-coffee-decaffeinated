@@ -54,10 +54,9 @@ func (db *appdbimpl) GetConversationByID(convID, userID string) (Conversation, e
     FROM conversations c
     WHERE c.id = ?`, convID).Scan(&name, &conv.Type, &conv.CreatorID, &photo, &lastMessageID, &otherUser)
 
-    
     // Restituisci un errore se la query fallisce
     if err != nil {
-        return conv, err 
+        return conv, err
     }
 
     // Controlla se la conversazione è privata
@@ -68,28 +67,20 @@ func (db *appdbimpl) GetConversationByID(convID, userID string) (Conversation, e
             if err != nil {
                 return conv, err
             }
-            otherUserPhoto, err := db.GetPhotoByID(otherUser.String)
-            if err != nil {
-                return conv, err
-            }
             conv.Name = otherUserName
-            conv.Photo = otherUserPhoto
-    } else {
+            conv.Photo = fmt.Sprintf("/users/%s/photo", otherUser.String) // Endpoint foto utente
+        } else {
             creatorName, err := db.GetUserByID(conv.CreatorID)
             if err != nil {
                 return conv, err
             }
-            creatorPhoto, err := db.GetPhotoByID(conv.CreatorID)
-            if err != nil {
-                return conv, err
-            }
             conv.Name = creatorName
-            conv.Photo = creatorPhoto
+            conv.Photo = fmt.Sprintf("/users/%s/photo", conv.CreatorID) // Endpoint foto utente
         }
     } else {
-        // Se la conversazione è di gruppo, usa il nome e la foto della conversazione
+        // Se la conversazione è di gruppo, usa il nome e l'endpoint della foto della conversazione
         conv.Name = name.String
-        conv.Photo = photo.String
+        conv.Photo = fmt.Sprintf("/group/%s/photo", convID)
     }
 
     // Recupera l'ultimo messaggio della conversazione
@@ -99,7 +90,7 @@ func (db *appdbimpl) GetConversationByID(convID, userID string) (Conversation, e
             return conv, err
         }
         conv.LastMessage = msg
-    }   else {
+    } else {
         conv.LastMessage = ""
     }
 

@@ -121,7 +121,23 @@ func (rt *_router) postConversations(w http.ResponseWriter, r *http.Request, _ h
 // Handler per GET /conversations/{convId}
 func (rt *_router) getConversationByID(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
-	convID := ps.ByName("conversation_id")
+    // Recupera l'ID dell'utente autenticato
+	userID := r.Header.Get("Authorization")
+
+	if userID == "" {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Controlla se l'utente esiste nel database
+    _, err := rt.db.GetUserByID(userID)
+    if err != nil {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    // Recupera l'ID della conversazione
+    convID := ps.ByName("conversation_id")
 
 	exists, err := rt.db.ConversationExists(convID)
     if err != nil {
@@ -130,13 +146,6 @@ func (rt *_router) getConversationByID(w http.ResponseWriter, r *http.Request, p
     }
     if !exists {
         http.Error(w, "Conversation not found", http.StatusNotFound)
-        return
-    }
-
-	userID := r.Header.Get("Authorization")
-
-	if userID == "" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
         return
     }
 
