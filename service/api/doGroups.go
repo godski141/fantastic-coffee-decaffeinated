@@ -1,6 +1,7 @@
 package api
 
 import (
+	"WasaTEXT/service/api/reqcontext"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -10,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -24,21 +24,10 @@ type NewGroupName struct {
 }
 
 // createGroup handles POST /groups/create-group
-func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
 	
 	// Recupera l'userId dal Authorization Header
-	userID := r.Header.Get("Authorization")
-	if userID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// Controllo se l'utente esiste nel database
-	_, err := rt.db.GetUserByID(userID)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID := ctx.UserId
 
 	// Decodifica il body della richiesta
 	var req GroupRequest
@@ -108,20 +97,9 @@ func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprou
 }
 
 // renameGroup handles PATCH conversations/groups/change-name/:groupId
-func (rt *_router) renameGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) renameGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	// Recupera l'userId dal Authorization Header
-	userID := r.Header.Get("Authorization")
-	if userID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// Controllo se l'utente esiste nel database
-	_, err := rt.db.GetUserByID(userID)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID := ctx.UserId
 
 	// Recupera il groupId dai parametri
 	groupID := ps.ByName("conversation_id")
@@ -192,20 +170,9 @@ func (rt *_router) renameGroup(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 // addToGroup handles POST conversations/groups/add-user/:groupId
-func (rt *_router) addToGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) addToGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	// Recupera l'userId dal Authorization Header
-	userID := r.Header.Get("Authorization")
-	if userID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// Controllo se l'utente esiste nel database
-	_, err := rt.db.GetUserByID(userID)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID := ctx.UserId
 
 	// Recupera il groupId dai parametri
 	groupID := ps.ByName("conversation_id")
@@ -283,21 +250,10 @@ func (rt *_router) addToGroup(w http.ResponseWriter, r *http.Request, ps httprou
 }
 
 // leaveGroup handles DELETE conversations/groups/leave/:groupId
-func (rt *_router) leaveGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) leaveGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 
 	// Recupera l'userId dal Authorization Header
-	userID := r.Header.Get("Authorization")
-	if userID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// Controllo se l'utente esiste nel database
-	_, err := rt.db.GetUserByID(userID)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID := ctx.UserId
 
 	// Recupera il groupId dai parametri
 	groupID := ps.ByName("conversation_id")
@@ -358,20 +314,9 @@ func (rt *_router) leaveGroup(w http.ResponseWriter, r *http.Request, ps httprou
 }
 
 // updatePhotoGroup handles PATCH conversations/groups/update-photo/:groupId 
-func (rt *_router) updateGroupPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) updateGroupPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
     // Recupera l'userId dal Authorization Header
-    userID := r.Header.Get("Authorization")
-    if userID == "" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-
-    // Controllo se l'utente esiste nel database
-    _, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+    userID := ctx.UserId
 
     // Recupera il groupId dai parametri
     groupID := ps.ByName("conversation_id")
@@ -464,20 +409,9 @@ func (rt *_router) updateGroupPhoto(w http.ResponseWriter, r *http.Request, ps h
 }
 
 // getGroupPhoto handles GET conversations/groups/photo/:conversation_id
-func (rt *_router) getGroupPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) getGroupPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	// Recupera l'userId dal Authorization Header
-	userID := r.Header.Get("Authorization")
-	if userID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// Controllo se l'utente esiste nel database
-	_, err := rt.db.GetUserByID(userID)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID := ctx.UserId
 
     // Recupera l'ID della conversazione
     conversationID := ps.ByName("conversation_id")

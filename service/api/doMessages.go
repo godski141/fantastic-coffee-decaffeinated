@@ -1,6 +1,7 @@
 package api
 
 import (
+	"WasaTEXT/service/api/reqcontext"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -24,21 +25,10 @@ type ReactionRequest struct {
 }
 
 // postMessage handles POST /conversations/:conversation_id/send-message
-func (rt *_router) postMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) postMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 
     // Recupera l'userID dall'header Authorization
-    userID := r.Header.Get("Authorization")
-    if userID == "" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-
-    // Controlla se l'utente esiste nel database
-    _, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+    userID := ctx.UserId
 
     // Recupera l'ID della conversazione dal parametro URL
     convID := ps.ByName("conversation_id")
@@ -112,20 +102,9 @@ func (rt *_router) postMessage(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 // deleteMessage handles DELETE /conversations/:conversation_id/messages/:message_id
-func (rt *_router) deleteMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) deleteMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
     // Recupera il creatorId dall'header Authorization
-	userID := r.Header.Get("Authorization")
-	if userID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-    // Controlla se l'utente esiste nel database
-    _, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+	userID := ctx.UserId
 
 
     // Recupera l'ID del messaggio dalla richiesta
@@ -211,21 +190,10 @@ func (rt *_router) deleteMessage(w http.ResponseWriter, r *http.Request, ps http
 }
 
 // postMessage handles POST /conversations/:conversation_id/messages/:message_id
-func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
     
     // Recupera il creatorId dall'header Authorization
-    userID := r.Header.Get("Authorization")
-    if userID == "" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-
-    // Controlla se l'utente esiste nel database
-    _, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+    userID := ctx.UserId
 
     // Recupera l'ID del messaggio dalla richiesta
     messageID := ps.ByName("message_id")
@@ -334,20 +302,9 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
 }
 
 // commentMessage handles POST /conversations/:conversation_id/messages/:message_id/reaction
-func (rt *_router) commentMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) commentMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
     // Recupera il creatorId dall'header Authorization
-    userID := r.Header.Get("Authorization")
-    if userID == "" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-
-    // Controlla se l'utente esiste nel database
-    _, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+    userID := ctx.UserId
 
     // Recupera l'ID del messaggio dalla richiesta
     messageID := ps.ByName("message_id")
@@ -418,20 +375,9 @@ func (rt *_router) commentMessage(w http.ResponseWriter, r *http.Request, ps htt
 }
 
 // unCommentMessage handles DELETE /conversations/:conversation_id/messages/:message_id/reaction
-func (rt *_router) unCommentMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) unCommentMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
     // Recupera l'userID dall'header Authorization
-    userID := r.Header.Get("Authorization")
-    if userID == "" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-
-    // Controlla se l'utente esiste nel database
-    _, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+    userID := ctx.UserId
 
     // Recupera l'ID del messaggio dalla richiesta
     messageID := ps.ByName("message_id")
@@ -500,20 +446,9 @@ func (rt *_router) unCommentMessage(w http.ResponseWriter, r *http.Request, ps h
 }
 
 // Handler per GET /conversations/{convId}/messages
-func (rt *_router) getMessagesFromConversation(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) getMessagesFromConversation(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
     // Recupera l'userID dall'header Authorization
-    userID := r.Header.Get("Authorization")
-    if userID == "" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-
-    // Verifica che l'utente esista nel database
-    _, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+    userID := ctx.UserId
 
     // Recupera l'ID della conversazione dalla richiesta
     conversationID := ps.ByName("conversation_id")

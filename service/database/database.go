@@ -57,6 +57,7 @@ type AppDatabase interface {
     GetMessagesFromConversation(conversationID string) ([]Message, error)
     IsConversationPrivate(convID string) (bool, error)
     IsUserCreatorOfGroup(userID, convID string) (bool, error)
+    GetMembersFromConversation(convID string) ([]User, error)
 	
     InsertMessage(convID string, userID string, text string) (string, error)
     GetMessageFromID(messageID string) (Message, error)

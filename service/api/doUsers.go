@@ -1,6 +1,7 @@
 package api
 
 import (
+	"WasaTEXT/service/api/reqcontext"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -18,16 +19,9 @@ type NewName struct {
 } 
 
 // getUserPhoto handles GET /users/get-photo/:user_id
-func (rt *_router) getUserPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *_router) getUserPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
     // Recupera l'userId dai parametri
-    userID := ps.ByName("user_id")
-
-    // Controllo se l'utente esiste nel database
-    _, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "User not found", http.StatusNotFound)
-        return
-    }
+    userID := ctx.UserId
 
     // Recupera il percorso della foto dal database
     photoPath, err := rt.db.GetUserPhotoByID(userID)
@@ -49,20 +43,9 @@ func (rt *_router) getUserPhoto(w http.ResponseWriter, r *http.Request, ps httpr
 }
 
 // modifyUserName handles PATCH /users/modify-name
-func (rt *_router) modifyUserName(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (rt *_router) modifyUserName(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
     // Recupera l'userId dal Authorization Header
-	userID := r.Header.Get("Authorization")
-	if userID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-    // Controllo se l'utente esiste nel database
-	_, err := rt.db.GetUserByID(userID)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID := ctx.UserId
 
     // Decodifica il corpo della richiesta
     var req NewName
@@ -85,7 +68,7 @@ func (rt *_router) modifyUserName(w http.ResponseWriter, r *http.Request, _ http
 
     lowername := strings.ToLower(req.Name)
     // Verifico che il nome non esista già
-    _, err = rt.db.GetUserByName(lowername)
+    _, err := rt.db.GetUserByName(lowername)
     if err == nil {
         http.Error(w, "Name already exists", http.StatusBadRequest)
         return
@@ -104,20 +87,9 @@ func (rt *_router) modifyUserName(w http.ResponseWriter, r *http.Request, _ http
 }
 
 // updateUserPhoto handles PATCH /users/update-photo
-func (rt *_router) updateUserPhoto(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (rt *_router) updateUserPhoto(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
     // Recupero l'userId dal Authorization Header
-    userID := r.Header.Get("Authorization")
-    if userID == "" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-
-    // Controllo se l'utente esiste nel database
-    _, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+    userID := ctx.UserId
 
     // Decodifica il corpo della richiesta
     var req struct {

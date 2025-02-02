@@ -15,7 +15,8 @@ import (
 type RequestContext struct {
 	// ReqUUID is the request unique ID
 	ReqUUID uuid.UUID
-
+	// UserId is the ID of the user that made the request
+	UserId string
 	// Logger is a custom field logger for the request
 	Logger logrus.FieldLogger
 }

@@ -261,3 +261,76 @@ func (db *appdbimpl) IsUserCreatorOfGroup(userID, convID string) (bool, error) {
         return false, fmt.Errorf("400: conversation is private")
     }
 }
+
+// getMembersFromConversation recupera tutti i membri di una conversazione
+func (db *appdbimpl) GetMembersFromConversation(convID string) ([]User, error) {
+    // Controllo se la conversazione è di gruppo
+    isPrivate, err := db.IsConversationPrivate(convID)
+    if err != nil {
+        return nil, err
+    }
+
+    // Se la conversazione è privata, recupera i due utenti
+    if isPrivate {
+        var creatorID, otherUserID string
+        err := db.c.QueryRow(`
+            SELECT creator_id, otherUser FROM conversations WHERE id = ? AND type = 'private'
+        `, convID).Scan(&creatorID, &otherUserID)
+        if err != nil {
+            return nil, err
+        }
+
+        // Recupera i dettagli degli utenti
+        var users []User
+        var creator User
+        var otherUser User
+        creatorName, err := db.GetUserByID(creatorID)
+        if err != nil {
+            return nil, err
+        }
+        creator.UserID = creatorID
+        creator.Name = creatorName
+        creator.Photo = fmt.Sprintf("/users/get-photo/%s", creatorID) // Endpoint foto utente
+        users = append(users, creator)
+
+        otherUserName, err := db.GetUserByID(otherUserID)
+        if err != nil {
+            return nil, err
+        }
+        otherUser.UserID = otherUserID
+        otherUser.Name = otherUserName
+        otherUser.Photo = fmt.Sprintf("/users/get-photo/%s", otherUserID) // Endpoint foto utente
+        users = append(users, otherUser)
+
+        return users, nil
+    } else {
+        // Se la conversazione è di gruppo, recupera tutti i membri
+        rows, err := db.c.Query(`
+            SELECT u.id, u.name, u.photo
+            FROM users u
+            JOIN group_members gm ON u.id = gm.user_id
+            WHERE gm.conversation_id = ?
+        `, convID)
+        if err != nil {
+            return nil, err
+        }
+        defer rows.Close()
+
+        // Inizializza una slice di utenti vuota
+        var users []User
+        // Per ogni utente trovato
+        for rows.Next() {
+            var user User
+            // Leggi i dettagli dell'utente
+            if err := rows.Scan(&user.UserID, &user.Name, &user.Photo); err != nil {
+                return nil, err
+            }
+            // Aggiungi l'utente alla slice
+            users = append(users, user)
+        }
+
+        // Restituisci la slice di utenti
+        return users, nil
+    }
+
+}
