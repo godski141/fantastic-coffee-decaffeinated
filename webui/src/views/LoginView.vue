@@ -1,81 +1,79 @@
 <script>
-import axios from 'axios';
 
 export default {
   data() {
     return {
-      username: '', // Campo per l'username
-      errorMsg: null, // Messaggio di errore
-      loading: false, // Stato di caricamento
-      userId: null, // ID utente dopo il login
+      username: "",  // Nome utente inserito nel form
+      errorMsg: null, // Messaggio di errore se il login fallisce
+      loading: false, // Indica se la richiesta è in corso
+      userId: null    // ID utente restituito dal backend
     };
   },
   methods: {
-    async handleLogin() {
+    async login() {
       this.errorMsg = null;
       this.loading = true;
 
       // Validazione lato frontend
       if (this.username.length < 3 || this.username.length > 50) {
-        this.errorMsg = 'Username must be between 3 and 50 characters.';
+        this.errorMsg = "Username must be between 3 and 50 characters.";
         this.loading = false;
         return;
       }
 
       try {
-        // Richiesta API al backend
-        const response = await axios.post('/session', { username: this.username });
-        
+        // Chiamata API al backend
+        const response = await this.$axios.post('/session', { username: this.username });
+
         // Salva l'ID utente restituito
         this.userId = response.data.user_id;
-        sessionStorage.setItem('user_id', this.userId); // Salva nel sessionStorage
+        sessionStorage.setItem('authToken', `Bearer ${this.userId}`); // Salva il token
+        sessionStorage.setItem('username', this.username);
 
-        // Reindirizza l'utente
+        // Reindirizza alla dashboard o a un'altra pagina
         this.$router.push('/dashboard');
       } catch (error) {
         // Gestione degli errori
-        this.errorMsg = error.response?.data || 'Login failed. Please try again.';
+        this.errorMsg = error.response?.data || "Login failed. Please try again.";
       } finally {
         this.loading = false;
       }
-    },
-  },
+    }
+  }
 };
 </script>
 
 <template>
-  <div class="login-container">
-    <!-- Messaggio di errore -->
-    <h3 v-if="errorMsg" class="alert alert-danger">{{ errorMsg }}</h3>
+  <div class="session-container">
+    <h1>Login</h1>
 
-    <!-- Indicatore di caricamento -->
-    <div v-if="loading">Loading...</div>
+    <!-- Messaggio di errore -->
+    <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
 
     <!-- Form di login -->
-    <form @submit.prevent="handleLogin">
+    <form @submit.prevent="login">
       <label for="username">Username:</label>
-      <input
-        type="text"
-        id="username"
-        v-model="username"
-        required
-        minlength="3"
+      <input 
+        type="text" 
+        id="username" 
+        v-model="username" 
+        required 
+        minlength="3" 
         maxlength="50"
-        placeholder="Enter your username"
       />
-      <button type="submit">Login</button>
+      <button type="submit" :disabled="loading">
+        {{ loading ? "Logging in..." : "Login" }}
+      </button>
     </form>
 
-    <!-- Messaggio di benvenuto -->
-    <div v-if="userId">
-      <p>Welcome, {{ username }}!</p>
-    </div>
+    <!-- Messaggio di benvenuto dopo il login -->
+    <p v-if="userId">Welcome, {{ username }}!</p>
   </div>
 </template>
 
 <style>
-/* Stili di base per il login */
-.login-container {
+/* Stili base */
+.session-container {
   max-width: 400px;
   margin: 0 auto;
   padding: 20px;
@@ -85,22 +83,24 @@ export default {
 }
 
 input {
-  display: block;
   width: 100%;
-  margin: 10px 0;
   padding: 8px;
+  margin: 10px 0;
 }
 
 button {
-  padding: 10px 15px;
+  padding: 10px;
   background-color: #007bff;
   color: white;
   border: none;
-  border-radius: 4px;
   cursor: pointer;
 }
 
-button:hover {
-  background-color: #0056b3;
+button:disabled {
+  background-color: #aaa;
+}
+
+.error {
+  color: red;
 }
 </style>
