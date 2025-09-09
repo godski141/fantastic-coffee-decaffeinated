@@ -22,6 +22,8 @@ type Message struct {
     Content        string
     Timestamp      string
     Status         string
+    Type           string
+    ReplyToMessageID *string // Nullable per messaggi che non sono reply
     Reactions []Reaction 
 }
 

@@ -31,6 +31,7 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.POST("/conversations/send-message/:conversation_id", rt.wrap(rt.postMessage, true))
 	rt.router.DELETE("/conversations/delete-message/:conversation_id/message/:message_id", rt.wrap(rt.deleteMessage, true))
 	rt.router.POST("/conversations/forward-message/:conversation_id/messages/:message_id", rt.wrap(rt.forwardMessage, true))
+	rt.router.POST("/conversations/reply-message/:conversation_id/message/:message_id", rt.wrap(rt.replyMessage, true))
 	rt.router.POST("/conversations/react/:conversation_id/messages/:message_id", rt.wrap(rt.commentMessage, true))
 	rt.router.DELETE("/conversations/delete-react/:conversation_id/messages/:message_id", rt.wrap(rt.unCommentMessage, true))
 	
@@ -38,6 +39,7 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.POST("/conversations/create-group", rt.wrap(rt.createGroup, true))
 	rt.router.PATCH("/conversations/group/change-name/:conversation_id", rt.wrap(rt.renameGroup, true))
 	rt.router.POST("/conversations/group/add/:conversation_id", rt.wrap(rt.addToGroup, true))
+	rt.router.GET("/conversations/group/members/:conversation_id", rt.wrap(rt.getGroupMembers, true))
 	rt.router.DELETE("/conversations/group/leave/:conversation_id", rt.wrap(rt.leaveGroup, true))
 	rt.router.PATCH("/conversations/group/change-photo/:conversation_id", rt.wrap(rt.updateGroupPhoto, true))
 	rt.router.GET("/conversations/group/get-photo/:conversation_id", rt.wrap(rt.getGroupPhoto, true))
@@ -46,6 +48,7 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.PATCH("/users/modify-username", rt.wrap(rt.modifyUserName, true))
 	rt.router.GET("/users/get-photo/:user_id", rt.wrap(rt.getUserPhoto, true))
 	rt.router.PATCH("/users/update-photo", rt.wrap(rt.updateUserPhoto, true))
+	rt.router.GET("/user/search", rt.wrap(rt.searchUsers, true))
 	
 	return rt.router
 }

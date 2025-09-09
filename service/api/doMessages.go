@@ -496,6 +496,108 @@ func isSingleEmoji(input string) bool {
 	return r != utf8.RuneError && size == len(input) && isEmojiRune(r)
 }
 
+// replyMessage handles POST /conversations/reply-message/{conversationId}/message/{messageId}
+func (rt *_router) replyMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
+    // Recupera l'userID dall'header Authorization
+    userID := ctx.UserId
+
+    // Recupera l'ID della conversazione dal parametro URL
+    convID := ps.ByName("conversation_id")
+    if convID == "" {
+        http.Error(w, "Conversation ID cannot be empty", http.StatusBadRequest)
+        return
+    }
+
+    // Recupera l'ID del messaggio originale dal parametro URL
+    originalMessageID := ps.ByName("message_id")
+    if originalMessageID == "" {
+        http.Error(w, "Message ID cannot be empty", http.StatusBadRequest)
+        return
+    }
+
+    // Verifica che la conversazione esista
+    exist, err := rt.db.ConversationExists(convID)
+    if err != nil {
+        http.Error(w, "Error checking conversation existence", http.StatusInternalServerError)
+        return
+    }
+    if !exist {
+        http.Error(w, "Conversation not found", http.StatusNotFound)
+        return
+    }
+
+    // Verifica se l'utente è un membro della conversazione
+    isMember, err := rt.db.IsUserInConversation(userID, convID)
+    if err != nil {
+        http.Error(w, "Error checking conversation membership", http.StatusInternalServerError)
+        return
+    }
+    if !isMember {
+        http.Error(w, "Forbidden: You are not a member of this conversation", http.StatusForbidden)
+        return
+    }
+
+    // Verifica che il messaggio originale esista
+    originalMessage, err := rt.db.GetMessageFromID(originalMessageID)
+    if err != nil {
+        if errors.Is(err, sql.ErrNoRows) {
+            http.Error(w, "Message not found", http.StatusNotFound)
+        } else {
+            http.Error(w, "Error fetching message", http.StatusInternalServerError)
+        }
+        return
+    }
+
+    // Verifica che il messaggio originale appartenga alla conversazione
+    if originalMessage.ConversationID != convID {
+        http.Error(w, "Forbidden: Message does not belong to this conversation", http.StatusForbidden)
+        return
+    }
+
+    // Decodifica il body della richiesta
+    var req struct {
+        Content string `json:"content"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "Invalid request body", http.StatusBadRequest)
+        return
+    }
+
+    // Controlla che il contenuto del messaggio non sia vuoto
+    if req.Content == "" {
+        http.Error(w, "Message content cannot be empty", http.StatusBadRequest)
+        return
+    }
+
+    // Inserisce il messaggio di reply nel database
+    // Nota: Assumendo che InsertReplyMessage sia un nuovo metodo del database
+    // che accetta anche replyToMessageId e type
+    replyMessageID, err := rt.db.InsertReplyMessage(convID, userID, req.Content, originalMessageID)
+    if err != nil {
+        http.Error(w, "Error inserting reply message", http.StatusInternalServerError)
+        return
+    }
+
+    // Aggiorna l'ultimo messaggio della conversazione
+    if err := rt.db.UpdateLastMessage(convID, replyMessageID); err != nil {
+        log.Println(err)
+        http.Error(w, "Error updating last message", http.StatusInternalServerError)
+        return
+    }
+
+    // Recupera il messaggio completo dal database
+    messageResponse, err := rt.db.GetMessageFromID(replyMessageID)
+    if err != nil {
+        http.Error(w, "Error fetching message", http.StatusInternalServerError)
+        return
+    }
+
+    // Invia il messaggio come risposta
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(messageResponse)
+}
+
 // isEmojiRune verifica se un carattere è una emoji valida
 func isEmojiRune(r rune) bool {
 	// Intervalli Unicode per le emoji

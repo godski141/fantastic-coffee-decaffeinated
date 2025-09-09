@@ -1,124 +1,146 @@
 openapi: 3.0.3
 info:
-  title: WasaText
-  description: | 
-    This is the yaml documentation for the WasaText Api
+  title: WasaText API
+  description: API for WASAText messaging platform
   version: 1.0.0
+tags:
+  - name: login
+    description: Authentication operations
+  - name: conversations
+    description: Operations related to conversations
+  - name: messages
+    description: Operations for managing messages
+  - name: groups
+    description: Operations related to groups
+  - name: users
+    description: Operations related to users
+
+security: # Apply the security globally to all operations
+  - bearerAuth: [] # use the same name as above
+
 paths:
   /session:
     post:
-      tags:
-        - login
+      security: []
+      tags: ["login"]
       summary: Logs in the user
-      description: >
-        If the user does not exist, it will be created,
-        and an identifier is returned.
-        If the user exists, the user identifier is returned.
+      description: |
+        If the user does not exist, it will be created, and an identifier is returned. If the user exists, the user identifier is returned.
       operationId: doLogin
       requestBody:
         description: User details
-        required: true
         content:
           application/json:
             schema:
+              description: "Schema for Login"
               type: object
               properties:
                 username:
+                  description: "The name of the user."
                   type: string
                   example: Maria
                   pattern: '^.*?$'
                   minLength: 3
                   maxLength: 16
+        required: true
       responses:
         '201':
           description: User log-in action successful
           content:
             application/json:
               schema:
+                description: "Schema for Login response"
                 type: object
                 properties:
-                  user_id:
+                  userId:
+                    # change here if you decide to use an integer
+                    # or any other type of identifier
+                    description: "Unique identifier for the logged-in user."
                     type: string
                     example: "1"
   /conversations:
     get:
       tags:
         - conversations
-      summary: Get all the users's conversations 
-      description: >
-        Get all the user conversations in a list.
+      summary: Get the user's conversations
+      description: Returns a list of all conversations for the logged-in user, sorted in reverse chronological order.
       operationId: getMyConversations
-      security:
-        - bearerAuth: []
+      parameters:
+      - $ref: "#/components/parameters/sort"  
       responses:
         '200':
-          description: List of conversations
+          description: List of user conversations
           content:
             application/json:
               schema:
+                description: "Schema for get conversation response"
                 type: array
-                items:
-                  $ref: '#/components/schemas/Conversation'
+                minItems: 0
+                maxItems: 500
+                items: 
+                  $ref: "#/components/schemas/Conversation"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /conversations/start-conversation:
     post:
       tags:
         - conversations
       summary: Start a new private conversation (1:1)
-      description: >
+      description: |
         Starts a new conversation with another user and returns the id of the conversation.
       operationId: createPrivateConversation
-      security:
-        - bearerAuth: []
       requestBody:
         description: Conversation details
-        required: true
         content:
           application/json:
             schema:
+              description: "Schema for start conversation"
               type: object
-              required:
-                - user_id
               properties:
                 username:
-                  type: string
-                  example: "hanniPham"
+                  $ref: '#/components/schemas/Username'
+        required: true
       responses:
         '200':
           description: Existing conversation found
           content:
             application/json:
               schema:
+                description: "Schema for existing conversation response"
                 type: object
                 properties:
-                  conversation_id:
-                    type: string
-                    example: "1"
+                  conversationId:
+                    $ref: '#/components/schemas/ConversationId'
         '201':
           description: New conversation created
           content:
             application/json:
               schema:
+                description: "Schema for new conversation response"
                 type: object
                 properties:
-                  conversation_id:
-                    type: string
-                    example: "1"
+                  conversationId:
+                    $ref: '#/components/schemas/ConversationId'
         '400':
-          description: Invalid request
+          description: Invalid username or user not found
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '404':
           description: User not found
-  /conversations/get-details/{conversation_id}:
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/get-details/{conversationId}:
+    parameters:
+      - $ref: "#/components/parameters/conversationId"
     get:
       tags:
         - conversations
       summary: Get a specific conversation
-      description: > 
-        Once given an ID, it returns a specific conversation
+      description: |
+        Returns all details of a specific conversation.
       operationId: getConversation
-      security:
-        - bearerAuth: []
-      parameters:
-      - $ref: '#/components/parameters/conversation_id'
       responses:
         '200':
           description: Details of the conversation
@@ -126,167 +148,249 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Conversation'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '404':
           description: Conversation not found
-  /conversations/delete/{conversation_id}:
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/delete/{conversationId}:
+    parameters:
+      - $ref: "#/components/parameters/conversationId"
     delete:
       tags:
         - conversations
       summary: Delete a conversation
+      description: Allows the user to delete a specific conversation.
       operationId: deleteConversation
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/conversation_id'
       responses:
         '204':
           description: Conversation deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: Forbidden - user does not have permission to delete this conversation
         '404':
           description: Conversation not found
-        '403':
-          description: Forbidden
-  /conversations/messages/{conversation_id}:
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/messages/{conversationId}:
+    parameters:
+      - $ref: "#/components/parameters/conversationId"
     get:
       tags:
         - messages
       summary: Get all messages from a conversation
-      description: >
+      description: |
         Retrieve all messages from a conversation, ordered by timestamp (oldest first).
       operationId: getMessagesFromConversation
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/conversation_id'
       responses:
         '200':
           description: Messages loaded successfully
           content:
             application/json:
               schema:
+                description: "Schema for get messages response"
                 type: array
+                minItems: 0
+                maxItems: 1000
                 items: 
                   $ref: '#/components/schemas/Message'
         '400':
           description: Invalid request (e.g., invalid conversation ID)
         '401':
-          description: Unauthorized (user not logged in)
+          $ref: '#/components/responses/UnauthorizedError'
         '403':
           description: Forbidden (user is not a member of the conversation)
         '404':
           description: Conversation not found
         '500':
-          description: Internal server error
-  /conversations/send-message/{conversation_id}:
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/send-message/{conversationId}:
+    parameters:
+      - $ref: "#/components/parameters/conversationId"
     post:
       tags:
         - messages
       summary: Send a message
-      description: > 
-        Send a message on an existing conversation
+      description: |
+        Send a message on an existing conversation.
       operationId: sendMessage
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/conversation_id'
       requestBody:
         description: Message details to send
-        required: true
         content:
           application/json:
             schema:
+              description: "Schema for send message"
               type: object
               properties:
                 content:
-                  type: string
-                  example: "Ciao come stai?"
+                  description: Text or photo content.
+                  oneOf:
+                  - $ref: '#/components/schemas/Text'
+                  - $ref: '#/components/schemas/Photo'
+        required: true
       responses:
         '201':
           description: Message sent successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message_id:
-                    type: string
-                    example: "1"
+                $ref: "#/components/schemas/Message"
         '400':
-          description: Invalid request
+          description: Invalid message content
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '404':
-          description: Conversation not found 
-  /conversations/delete-message/{conversation_id}/message/{message_id}:
+          description: Conversation not found
+        '500':
+          $ref: '#/components/responses/InternalServerError' 
+  /conversations/delete-message/{conversationId}/message/{messageId}:
+    parameters:
+      - $ref: "#/components/parameters/conversationId"
+      - $ref: "#/components/parameters/messageId"
     delete:
       tags:
         - messages
       summary: Delete a sent message
+      description: Allows the user to delete a specific message from a conversation.
       operationId: deleteMessage
-      security:
-        - bearerAuth: []
-      parameters:
-      - $ref: '#/components/parameters/conversation_id'
-      - $ref: '#/components/parameters/message_id'
       responses:
         '204':
           description: Message deleted successfully
+        '400':
+          description: Invalid message id or conversation id
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Conversation or message not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     post:
       tags:
         - messages
       summary: Forward a message to another conversation
+      description: Allows the user to forward an existing message to a conversation by specifying the conversation id in the request body.
       operationId: forwardMessage
-      security:
-        - bearerAuth: []
-      parameters:
-      - $ref: '#/components/parameters/conversation_id'
-      - $ref: '#/components/parameters/message_id'
       requestBody:
-        description: Message forwarding details
-        required: true
+        description: Target conversation id for the forwarded message
         content:
           application/json:
             schema:
+              description: "Schema for forward message"
               type: object
               properties:
-                conversation_id:
-                  type: string
-                  example: "3"
+                conversationId:
+                  $ref: '#/components/schemas/ConversationId'
+        required: true
       responses:
         '201':
           description: Message forwarded successfully
-  /conversations/react/{conversation_id}/messages/{message_id}:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        '400':
+          description: Invalid conversation or message id, or invalid target conversation id
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Original conversation or message not found, or target conversation not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/react/{conversationId}/messages/{messageId}:
+    parameters:
+      - $ref: "#/components/parameters/conversationId"
+      - $ref: "#/components/parameters/messageId"
     post:
       tags:
         - messages
       summary: Add a comment to a message
+      description: Allows the user to add a reaction or comment to a specific message in a conversation.
       operationId: commentMessage
-      security:
-        - bearerAuth: []
-      parameters:
-      - $ref: '#/components/parameters/conversation_id'
-      - $ref: '#/components/parameters/message_id'
       requestBody:
         description: Comment details
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/Comment'
+        required: true
       responses:
         '201':
           description: Comment added successfully
-  /conversations/delete-react/{conversation_id}/messages/{message_id}:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '400':
+          description: Invalid comment format
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Conversation or message not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/delete-react/{conversationId}/messages/{messageId}:
+    parameters:
+      - $ref: "#/components/parameters/conversationId"
+      - $ref: "#/components/parameters/messageId"
     delete:
       tags:
         - messages
       summary: Remove a comment from a message
+      description: Allows the user to remove a specific comment from a message in a conversation.
       operationId: uncommentMessage
-      security:
-        - bearerAuth: []
-      parameters:
-      - $ref: '#/components/parameters/conversation_id'
-      - $ref: '#/components/parameters/message_id'
       responses:
         '204':
           description: Comment removed successfully
+        '400':
+          description: Invalid message or comment id
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Conversation, message, or comment not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  
+  /conversations/reply-message/{conversationId}/message/{messageId}:
+    parameters:
+      - $ref: "#/components/parameters/conversationId"
+      - $ref: "#/components/parameters/messageId"
+    post:
+      tags:
+        - messages
+      summary: Reply to a message in a conversation
+      description: Create a new message that replies to an existing message in a conversation.
+      operationId: replyMessage
+      requestBody:
+        description: Reply message details
+        content:
+          application/json:
+            schema:
+              description: "Schema for reply message"
+              type: object
+              properties:
+                content:
+                  description: Text or photo content.
+                  oneOf:
+                  - $ref: '#/components/schemas/Text'
+                  - $ref: '#/components/schemas/Photo'
+        required: true
+      responses:
+        "201":
+          description: Message reply successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        '400':
+          description: Invalid conversation, message id or content message
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Conversation or message not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /conversations/create-group:
     post:
       tags:
@@ -294,129 +398,206 @@ paths:
       summary: Create a new group
       description: Creates a new group with the specified members.
       operationId: createGroup
-      security:
-        - bearerAuth: []
       requestBody:
         description: Group details to create
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/NewGroup'
+        required: true
       responses:
         '201':
           description: Group created successfully
           content:
             application/json:
               schema:
+                description: "Schema for create group response"
                 type: object
                 properties:
-                  conversation_id:
-                    type: string
-                    example: "1"
+                  conversationId:
+                    $ref: '#/components/schemas/ConversationId'
         '400':
-          description: Invalid request
-  /conversations/group/change-name/{group_id}:
+          description: Invalid request - invalid group data or members
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/group/change-name/{groupId}:
+    parameters:
+      - $ref: "#/components/parameters/groupId"
     patch:
       tags:
         - groups
       summary: Change the group's name
+      description: Allows a user to change the name of an existing group.
       operationId: setGroupName
-      security:
-        - bearerAuth: []
-      parameters:
-      - $ref: '#/components/parameters/group_id'
       requestBody:
         description: New group name
-        required: true
         content:
           application/json:
             schema:
+              description: "Schema for set group name"
               type: object
               properties:
                 name:
+                  description: Group name
                   type: string
                   example: "New Study Group"
+                  pattern: '^.*?$'
+                  minLength: 3
+                  maxLength: 16
+        required: true
       responses:
         '200':
           description: Group name updated successfully
+          content:
+            application/json:
+              schema:
+                description: "Schema for set group name response"
+                type: object
+                properties:
+                  groupId:
+                    $ref: "#/components/schemas/GroupId"
+                  newName:
+                    description: New name of the group.
+                    type: string
+                    example: "New Study Group"
+                    pattern: '^.*?$'
+                    minLength: 3
+                    maxLength: 16
+        '400':
+          description: Invalid group name
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '404':
           description: Group not found
-  /conversations/group/add/{group_id}:
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/group/add/{groupId}:
+    parameters:
+      - $ref: "#/components/parameters/groupId"
     post:
-      parameters:
-      - $ref: '#/components/parameters/group_id'
       tags:
         - groups
       summary: Add a user to a group
+      description: Allows the user to add another user to an existing group.
       operationId: addToGroup
-      security:
-        - bearerAuth: []
       requestBody:
-        description: User ID to add
-        required: true
+        description: User to add to the group
         content:
           application/json:
             schema:
+              description: "Schema for add user to group"
               type: object
               properties:
                 username:
-                  type: string
-                  example: "hanni"
+                  $ref: '#/components/schemas/Username'
+        required: true
+      responses:
+        '204':
+          description: User added successfully
+        '400':
+          description: Invalid group id or username
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Group or user not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/group/members/{groupId}:
+    parameters:
+      - $ref: "#/components/parameters/groupId"
+    get:
+      tags:
+        - groups
+      summary: Get group members
+      description: Returns a list of usernames of users present in the specified group.
+      operationId: getGroupMembers
       responses:
         '200':
-          description: User added to group
-  /conversations/group/leave/{group_id}:
+          description: List of group members
+          content:
+            application/json:
+              schema:
+                description: "Schema for get group members"
+                type: array
+                minItems: 0
+                maxItems: 10
+                items:
+                  $ref: "#/components/schemas/Username"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Group not found or user does not have access to the group
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/group/leave/{groupId}:
+    parameters:
+      - $ref: "#/components/parameters/groupId"
     delete:
       tags:
         - groups
       summary: Leave a group
+      description: Allows a user to leave an existing group they are part of.
       operationId: leaveGroup
-      security:
-        - bearerAuth: []
-      parameters:
-      - $ref: '#/components/parameters/group_id'
       responses:
-        '200':
-          description: User left the group successfully
+        '204':
+          description: User successfully left the group
+        '400':
+          description: Invalid group id
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '404':
-          description: Group not found
-  /conversations/group/update-photo/{group_id}:
+          description: Group not found or user is not a member of the group
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/group/update-photo/{groupId}:
+    parameters:
+      - $ref: "#/components/parameters/groupId"
     patch:
       tags:
         - groups
       summary: Update group photo
+      description: Allows the user to change the photo of an existing group.
       operationId: setGroupPhoto
-      security:
-        - bearerAuth: []
-      parameters:
-      - $ref: '#/components/parameters/group_id'
       requestBody:
-        description: New group photo 
-        required: true
+        description: New group photo
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              type: object
-              properties:
-                photo:
-                  type: string
-                  example: "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABjElEQVRIS+2Vv0oDQRSGv7V"
+              $ref: '#/components/schemas/Photo'
+        required: true
       responses:
         '200':
           description: Group photo updated successfully
+          content:
+            application/json:
+              schema:
+                description: "Schema for set group photo response"
+                type: object
+                properties:
+                  groupId:
+                    $ref: '#/components/schemas/GroupId'
+                  photoUrl:
+                    $ref: '#/components/schemas/Photo'
+        '400':
+          description: Invalid photo
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '404':
           description: Group not found
-  /conversations/group/get-photo/{conversation_id}:
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /conversations/group/get-photo/{conversationId}:
+    parameters:
+      - $ref: "#/components/parameters/conversationId"
     get:
       tags:
         - groups
       summary: Get the photo of a conversation
-      description: >
+      description: |
         Retrieves the photo of a conversation by its ID. The photo is returned as a binary image file.
       operationId: getConversationPhoto
-      parameters:
-        - $ref: '#/components/parameters/conversation_id'
       responses:
         '200':
           description: Photo retrieved successfully
@@ -429,75 +610,92 @@ paths:
               schema:
                 type: string
                 format: binary
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '404':
           description: Conversation or photo not found
-        '401':
-          description: Unauthorized
         '500':
-          description: Internal server error
-      security:
-        - bearerAuth: []
+          $ref: '#/components/responses/InternalServerError'
   /user/modify-username:
     patch:
       tags: 
         - users
       summary: Update the logged in user's username
+      description: Allows a logged-in user to change their username if it is not already in use.
       operationId: setMyUserName
-      security:
-        - bearerAuth: []
       requestBody:
         description: New username to set
-        required: true
         content:
           application/json:
             schema:
+              description: "Schema for change username"
               type: object
               properties:
-                new_name: 
-                  type: string
-                  example: "godski"
+                newName: 
+                  $ref: '#/components/schemas/Username'
+        required: true
       responses:
         '200':
           description: Username updated successfully
+          content:
+            application/json:
+              schema:
+                description: "Schema for change username response"
+                type: object
+                properties:
+                  userId:
+                    $ref: '#/components/schemas/UserId'
+                  newUsername:
+                    $ref: '#/components/schemas/Username'
+        '400':
+          description: Invalid username or username already in use
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /user/update-photo:
     patch:
       tags:
         - users
       summary: Update user profile photo
+      description: Allows the user to update their profile photo.
       operationId: setMyPhoto
-      security:
-        - bearerAuth: []
       requestBody:
-        description: New profile photo
-        required: true
+        description: The photo file to upload
         content:
           multipart/form-data:
             schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
+              $ref: '#/components/schemas/Photo'
+        required: true
       responses:
         '200':
           description: Profile photo updated successfully
+          content:
+            application/json:
+              schema:
+                description: "Schema for set my photo response"
+                type: object
+                properties:
+                  userId:
+                    $ref: '#/components/schemas/UserId'
+                  photo:
+                    $ref: '#/components/schemas/Photo'
         '400':
           description: Invalid photo
-  /user/get-photo/{user_id}:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /user/get-photo/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/userId"
     get:
       tags:
         - users
       summary: Get the photo of a user
-      description: >
+      description: |
         Retrieves the photo of a user by their ID. If the user does not have a photo, a default photo is returned.
       operationId: getUserPhoto
-      parameters:
-        - name: user_id
-          in: path
-          required: true
-          description: The ID of the user whose photo is to be retrieved.
-          schema:
-            type: string
       responses:
         '200':
           description: Photo retrieved successfully
@@ -510,129 +708,272 @@ paths:
               schema:
                 type: string
                 format: binary
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '404':
           description: User not found or photo not set
         '500':
-          description: Internal server error
-      security:
-        - bearerAuth: []
+          $ref: '#/components/responses/InternalServerError'
+  /user/search:
+    get:
+      tags:
+        - users
+      summary: Search for users by username
+      description: Allows a user to search for other users by username.
+      operationId: searchUsers
+      parameters:
+        - name: username
+          in: query
+          description: The username or part of the username to search for.
+          required: true
+          schema:
+            $ref: '#/components/schemas/Username'
+      responses:
+        '200':
+          description: List of matching usernames
+          content:
+            application/json:
+              schema:
+                description: "Schema for user search response"
+                type: array
+                minItems: 0
+                maxItems: 100
+                items:
+                  $ref: '#/components/schemas/Username'
+        '400':
+          description: Invalid search query
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
-                
-    
 components:
-  parameters:
-    message_id:
-      schema:
-        type: string
-      name: message_id
-      in: path
-      required: true
-      description: The ID of the message
-      allowEmptyValue: false
-    group_id:
-      schema:
-        type: string
-      name: group_id
-      in: path
-      required: true
-      description: The ID of the group
-      allowEmptyValue: false
-    conversation_id:
-      schema:
-        type: string
-      name: conversation_id
-      in: path
-      required: true
-      description: The conversation ID
-      allowEmptyValue: false
-  securitySchemes:
-    bearerAuth:
+  securitySchemes: # Define the security scheme type (HTTP bearer)
+    bearerAuth: # arbitrary name for the security scheme
       type: http
       scheme: bearer
+  
   schemas:
-    NewGroup:
-      type: object
-      properties:
-        name:
-          type: string
-          example: "Group Example"
-        members:
-          type: array
-          items:
-            type: string
-            example: "hanni"
-      required:
-        - name
-        - members
     Message:
+      title: Message
+      description: "Represent a single Message."
       type: object
       properties:
-        message_id:
+        messageId:
+          description: Unique message identifier.
           type: string
           example: "1"
-        sender_id:
-          type: string
-          example: "1"
-        content:
-          type: string
-          example: "Hello! today is the 1st of the month"
-        timestamp:
+          readOnly: true
+        timestamp: 
           type: string
           format: date-time
+          description: Timestamp when the message was sent.
           example: "2025-01-03T10:15:30Z"
+        content:
+          description: Text or photo content.
+          oneOf:
+            - $ref: '#/components/schemas/Text'
+            - $ref: '#/components/schemas/Photo'
+        senderId:
+          $ref: '#/components/schemas/UserId'
         status:
           type: string
-          enum:
-          - sent
-          - received
-          - read
+          enum: ["sent", "received", "read"]
+          description: Status of the sent message indicated by checkmarks
+          example: "read"
         reactions:
           type: array
+          minItems: 0
+          maxItems: 500
+          description: List of reactions on the message
           items:
-            type: object
-            properties:
-              user_id:
-                type: string
-                example: "1"
-              reaction:
-                type: string
-                example: "xD"
-    Conversation:
+            $ref: '#/components/schemas/Comment'
+        type:
+          description: Type of the message
+          type: string
+          enum: ["standard", "forward", "reply"]
+          example: "standard"
+        replyToMessageId:
+          type: string
+          description: The ID of the message this message is replying to.
+          example: "12"
+          nullable: true
+              
+    Comment:
+      title: Comment
+      description: "Represent a single Comment."
       type: object
       properties:
-        conversation_id:
+        commentId:
+          description: Unique comment identifier.
           type: string
           example: "1"
+          readOnly: true
+        userId:
+          $ref: '#/components/schemas/UserId'
+        emoji:
+          type: string
+          description: The reaction as an emoji
+          example: "👍"
+          pattern: '^.*?$'
+          minLength: 1
+          maxLength: 2
+          
+    Conversation:
+      title: Conversation
+      description: "Represents a single Conversation."
+      type: object
+      properties:
+        conversationId:
+          $ref: '#/components/schemas/ConversationId'
         name:
+          description: Name of the user or the group.
           type: string
           example: "Giorgio"
+          minLength: 3
+          maxLength: 16
+          pattern: "^.*?$"
         type:
+          description: Type of the conversation
           type: string
-          enum:
-            - private
-            - group
+          enum: ["private", "group"]
           example: "private"
-        creator_id:
-          type: string
-          example: "1"
+        creatorId:
+          $ref: '#/components/schemas/UserId'
         photo:
-          type: string
-          format: binary
-          example: ""
-          nullable: true
-        last_message:
+          $ref: '#/components/schemas/Photo'
+        lastMessage:
+          description: Conversation's last message details.
           type: string
           example: "reply to my message!"
           nullable: true
-      required:
-        - id
-        - type
-    Comment:
+    
+    NewGroup:
+      title: NewGroup
+      description: "Schema for creating a new group."
       type: object
       properties:
-        emoji:
+        name:
+          description: Group name
           type: string
-          description: The emoji used as a reaction
-          example: "👍"
+          example: "Group Example"
+          pattern: '^.*?$'
+          minLength: 3
+          maxLength: 16
+        members:
+          description: List of usernames to add to the group
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/Username'
       required:
-        - emoji
+        - name
+        - members
+    
+    Photo:
+      description: Base64 encoded image data
+      type: string
+      format: byte
+      pattern: "^[01]+$"
+      minLength: 0
+      maxLength: 9999999999999999999
+      
+    Username:
+      description: Username of the user.
+      type: string
+      example: "user123"
+      minLength: 3
+      maxLength: 16
+      pattern: "^.*?$"
+      
+    UserId:
+      description: Unique user identifier
+      type: string
+      example: "1"
+      readOnly: true
+      
+    GroupId:
+      description: Unique group identifier
+      type: string
+      example: "1"
+      readOnly: true
+      
+    ConversationId:
+      description: Unique conversation identifier
+      type: string
+      example: "1"
+      readOnly: true
+      
+    Text:
+      type: string
+      description: Text content of the message
+      example: "Hello, how are you?"
+      minLength: 1
+      maxLength: 500
+      pattern: '^.*?$'
+      
+      
+  parameters:
+    userId:
+      schema:
+        $ref: '#/components/schemas/UserId'
+      name: userId
+      in: path
+      required: true
+      description: User id
+      
+    conversationId:
+      schema:
+        $ref: '#/components/schemas/ConversationId'
+      name: conversationId
+      in: path
+      required: true
+      description: Conversation id
+      
+    messageId:
+      schema:
+        type: string
+        example: "1"
+        readOnly: true
+        description: "Unique identifier for the message."
+      name: messageId
+      in: path
+      required: true
+      description: Message id
+      
+    groupId:
+      schema:
+        $ref: '#/components/schemas/GroupId'
+      name: groupId
+      in: path
+      required: true
+      description: Group id
+      
+    commentId:
+      schema:
+        type: string
+        example: "1"
+        readOnly: true
+        description: "Unique identifier for the comment."
+      name: commentId
+      in: path
+      required: true
+      description: Comment id
+      
+    sort:
+      schema:
+        type: string
+        enum: [asc, desc]
+        description: "Defines the sorting order of messages."
+      name: sort
+      in: query
+      required: true
+      description: "Sorts by last message timestamp. Use 'desc' for reverse chronological order, or 'asc' for chronological order."
+      
+  responses:
+    UnauthorizedError:
+      description: Access token is missing or invalid
+      
+    InternalServerError:
+      description: Internal server error

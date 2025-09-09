@@ -146,3 +146,31 @@ func (rt *_router) updateUserPhoto(w http.ResponseWriter, r *http.Request, _ htt
     w.WriteHeader(http.StatusNoContent)
 }
 
+// searchUsers handles GET /user/search?username={query}
+func (rt *_router) searchUsers(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
+    // Recupera il parametro di query 'username'
+    query := r.URL.Query().Get("username")
+    if query == "" {
+        http.Error(w, "Username query parameter is required", http.StatusBadRequest)
+        return
+    }
+
+    // Verifica che la query sia valida (minimo 1 carattere)
+    if len(query) < 1 {
+        http.Error(w, "Search query must be at least 1 character long", http.StatusBadRequest)
+        return
+    }
+
+    // Cerca utenti nel database
+    usernames, err := rt.db.SearchUsersByUsername(query)
+    if err != nil {
+        ctx.Logger.WithError(err).Error("Error searching users")
+        http.Error(w, "Internal server error", http.StatusInternalServerError)
+        return
+    }
+
+    // Risposta con la lista di username
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(usernames)
+}
+

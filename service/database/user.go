@@ -53,6 +53,33 @@ func (db *appdbimpl) ModifyUserName(id string, name string) error {
     return err
 }
 
+// SearchUsersByUsername cerca utenti per username parziale
+func (db *appdbimpl) SearchUsersByUsername(query string) ([]string, error) {
+    // Query per cercare utenti che contengono la stringa di ricerca
+    // Utilizziamo LIKE con % per ricerca parziale, limitiamo a 100 risultati
+    rows, err := db.c.Query("SELECT name FROM users WHERE name LIKE ? ORDER BY name LIMIT 100", "%"+query+"%")
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    
+    var usernames []string
+    for rows.Next() {
+        var username string
+        if err := rows.Scan(&username); err != nil {
+            return nil, err
+        }
+        usernames = append(usernames, username)
+    }
+    
+    // Controlla se ci sono stati errori durante l'iterazione
+    if err := rows.Err(); err != nil {
+        return nil, err
+    }
+    
+    return usernames, nil
+}
+
 // updateUserPhoto aggiorna la foto dell'utente con l'id specificato
 func (db *appdbimpl) UpdateUserPhoto(id string, photoPath string) error {
     _, err := db.c.Exec("UPDATE users SET photo = ? WHERE id = ?", photoPath,

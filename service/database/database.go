@@ -44,7 +44,8 @@ type AppDatabase interface {
 	CreateUser(name string) (string, error)
 	GetUserByID(id string) (string, error)
     GetUserPhotoByID(id string) (string, error)
-	GetUserByName(name string) (string, error)
+    GetUserByName(name string) (string, error)
+    SearchUsersByUsername(query string) ([]string, error)
     ModifyUserName(id string, name string) error
     UpdateUserPhoto(id string, photoPath string) error
 
@@ -60,6 +61,7 @@ type AppDatabase interface {
     GetMembersFromConversation(convID string) ([]User, error)
 	
     InsertMessage(convID string, userID string, text string) (string, error)
+    InsertReplyMessage(convID string, userID string, text string, replyToMessageID string) (string, error)
     GetMessageFromID(messageID string) (Message, error)
     UpdateLastMessage(convID string, messageID string) error
     MessageExists(messageID string) (bool, error)
@@ -133,8 +135,11 @@ func New(db *sql.DB) (AppDatabase, error) {
                     reaction_count INTEGER DEFAULT 0,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                     status TEXT CHECK(status IN ('sent', 'received', 'read')) NOT NULL,
+                    type TEXT CHECK(type IN ('standard', 'forward', 'reply')) DEFAULT 'standard',
+                    reply_to_message_id INTEGER,
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
-                    FOREIGN KEY (sender_id) REFERENCES users(id)
+                    FOREIGN KEY (sender_id) REFERENCES users(id),
+                    FOREIGN KEY (reply_to_message_id) REFERENCES messages(id) ON DELETE SET NULL
                 );`
             case "group_members":
                 sqlStmt = `CREATE TABLE group_members (

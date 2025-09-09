@@ -459,3 +459,67 @@ func (rt *_router) getGroupPhoto(w http.ResponseWriter, r *http.Request, ps http
     // Serve il file immagine
     http.ServeFile(w, r, photoPath)
 }
+
+// getGroupMembers handles GET /conversations/group/members/{groupId}
+func (rt *_router) getGroupMembers(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
+    // Recupera l'userId dal Authorization Header
+    userID := ctx.UserId
+
+    // Recupera il groupId dai parametri
+    groupID := ps.ByName("conversation_id")
+    if groupID == "" {
+        http.Error(w, "Group ID cannot be empty", http.StatusBadRequest)
+        return
+    }
+
+    // Controlla se il gruppo esiste
+    exists, err := rt.db.ConversationExists(groupID)
+    if err != nil {
+        http.Error(w, "Error checking group existence", http.StatusInternalServerError)
+        return
+    }
+    if !exists {
+        http.Error(w, "Group not found", http.StatusNotFound)
+        return
+    }
+
+    // Se esiste, controlla se è un gruppo (non una conversazione privata)
+    isPrivate, err := rt.db.IsConversationPrivate(groupID)
+    if err != nil {
+        http.Error(w, "Internal server error", http.StatusInternalServerError)
+        return
+    }
+    if isPrivate {
+        http.Error(w, "Group not found", http.StatusNotFound)
+        return
+    }
+
+    // Controlla se l'utente è membro del gruppo
+    isMember, err := rt.db.IsUserInConversation(userID, groupID)
+    if err != nil {
+        http.Error(w, "Internal server error", http.StatusInternalServerError)
+        return
+    }
+    if !isMember {
+        http.Error(w, "Group not found or user does not have access to the group", http.StatusNotFound)
+        return
+    }
+
+    // Recupera i membri del gruppo
+    members, err := rt.db.GetMembersFromConversation(groupID)
+    if err != nil {
+        ctx.Logger.WithError(err).Error("Error fetching group members")
+        http.Error(w, "Internal server error", http.StatusInternalServerError)
+        return
+    }
+
+    // Estrai solo i nomi utente (secondo la specifica API)
+    var usernames []string
+    for _, member := range members {
+        usernames = append(usernames, member.Name)
+    }
+
+    // Risposta con la lista di username
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(usernames)
+}

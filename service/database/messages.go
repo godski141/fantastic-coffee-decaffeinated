@@ -11,7 +11,7 @@ func (db *appdbimpl) InsertMessage(convID string, userID string, text string) (s
 	// Inserisce il messaggio nel database
     var messageID string
     err := db.c.QueryRow(
-        "INSERT INTO messages (conversation_id, sender_id, content, status) VALUES (?, ?, ?, 'sent') RETURNING id",
+        "INSERT INTO messages (conversation_id, sender_id, content, status, type) VALUES (?, ?, ?, 'sent', 'standard') RETURNING id",
         convID, userID, text,
     ).Scan(&messageID)
 
@@ -24,15 +24,42 @@ func (db *appdbimpl) InsertMessage(convID string, userID string, text string) (s
     return messageID, nil
 }
 
+//	InsertReplyMessage inserisce un messaggio di reply nel database
+func (db *appdbimpl) InsertReplyMessage(convID string, userID string, text string, replyToMessageID string) (string, error) {
+
+	// Inserisce il messaggio di reply nel database
+    var messageID string
+    err := db.c.QueryRow(
+        "INSERT INTO messages (conversation_id, sender_id, content, status, type, reply_to_message_id) VALUES (?, ?, ?, 'sent', 'reply', ?) RETURNING id",
+        convID, userID, text, replyToMessageID,
+    ).Scan(&messageID)
+
+	// Restituisce un errore se la query non è andata a buon fine
+    if err != nil {
+        return "", err
+    }
+
+	// Restituisce l'ID del messaggio di reply
+    return messageID, nil
+}
+
 //	GetMessageFromID recupera un messaggio dal database dato il suo ID
 func (db *appdbimpl) GetMessageFromID(messageID string) (Message, error) {
 	var message Message
+	var replyToMessageID sql.NullString
 	
-	// Esegue la query per recuperare il messaggio
+	// Esegue la query per recuperare il messaggio inclusi i nuovi campi
 	err := db.c.QueryRow(
-		"SELECT id, conversation_id, sender_id, content, timestamp, status FROM messages WHERE id = ?",
+		"SELECT id, conversation_id, sender_id, content, timestamp, status, COALESCE(type, 'standard'), reply_to_message_id FROM messages WHERE id = ?",
 		messageID,
-	).Scan(&message.MessageID, &message.ConversationID, &message.SenderID, &message.Content, &message.Timestamp, &message.Status)
+	).Scan(&message.MessageID, &message.ConversationID, &message.SenderID, &message.Content, &message.Timestamp, &message.Status, &message.Type, &replyToMessageID)
+	
+	// Gestisce il campo nullable reply_to_message_id
+	if replyToMessageID.Valid {
+		message.ReplyToMessageID = &replyToMessageID.String
+	} else {
+		message.ReplyToMessageID = nil
+	}
 	
     message.Reactions = []Reaction{}
 	if err != nil {
@@ -183,6 +210,7 @@ func (db *appdbimpl) GetMessagesFromConversation(conversationID string) ([]Messa
     rows, err := db.c.Query(`
         SELECT 
             m.id, m.conversation_id, m.sender_id, m.content, m.timestamp, m.status,
+            COALESCE(m.type, 'standard') AS type, m.reply_to_message_id,
             COALESCE(r.user_id, '') AS reactionUser, 
             COALESCE(r.reaction, '') AS reaction
         FROM messages m
@@ -198,23 +226,34 @@ func (db *appdbimpl) GetMessagesFromConversation(conversationID string) ([]Messa
     messages := make(map[string]Message)
 
     for rows.Next() {
-        var msgID, convId, senderID, content, timestamp, status, reactionUser, reaction string
+        var msgID, convId, senderID, content, timestamp, status, msgType, reactionUser, reaction string
+        var replyToMessageID sql.NullString
 
-        if err := rows.Scan(&msgID, &convId, &senderID, &content, &timestamp, &status, &reactionUser, &reaction); err != nil {
+        if err := rows.Scan(&msgID, &convId, &senderID, &content, &timestamp, &status, &msgType, &replyToMessageID, &reactionUser, &reaction); err != nil {
             return nil, err
         }
 
         // Se il messaggio non è già nella mappa, lo aggiungiamo
         if _, exists := messages[msgID]; !exists {
-            messages[msgID] = Message{
+            msg := Message{
                 MessageID: msgID,
                 ConversationID: convId,
                 SenderID:  senderID,
                 Content:   content,
                 Timestamp: timestamp,
                 Status:    status,
+                Type:      msgType,
                 Reactions: []Reaction{},
             }
+            
+            // Gestisce il campo nullable reply_to_message_id
+            if replyToMessageID.Valid {
+                msg.ReplyToMessageID = &replyToMessageID.String
+            } else {
+                msg.ReplyToMessageID = nil
+            }
+            
+            messages[msgID] = msg
         }
 
         // Se c'è una reazione, la aggiungiamo
