@@ -1,8 +1,12 @@
 <script>
 import { getMessages, sendMessage } from '../../services/axios.js'
+import Message from './Message.vue'
 
 export default {
 	name: 'ChatWindow',
+	components: {
+		Message
+	},
 	props: {
 		conversation: {
 			type: Object,
@@ -16,7 +20,8 @@ export default {
 			error: null,
 			newMessage: '',
 			sending: false,
-			scrollToBottom: true
+			scrollToBottom: true,
+			userNames: {} // Mappa per memorizzare i nomi utente
 		}
 	},
 	watch: {
@@ -53,6 +58,8 @@ export default {
 			this.error = null
 			try {
 				this.messages = await getMessages(this.conversation.ConvID)
+				// Carica i nomi utente dopo aver caricato i messaggi
+				await this.loadUserNames()
 			} catch (error) {
 				console.error('Errore nel caricamento messaggi:', error)
 				this.error = 'Errore nel caricamento dei messaggi'
@@ -122,6 +129,45 @@ export default {
 			// Recupera l'ID utente dal localStorage
 			const currentUserId = localStorage.getItem('userId')
 			return message.SenderID === currentUserId
+		},
+		
+		isGroupConversation() {
+			// Determina se la conversazione è un gruppo
+			// Controlla sia 'Type' (PascalCase) che 'type' (camelCase)
+			if (this.conversation) {
+				const conversationType = this.conversation.Type || this.conversation.type
+				if (conversationType) {
+					return conversationType === 'group'
+				}
+			}
+			
+			// Fallback: assumiamo che sia privata se non abbiamo il tipo
+			return false
+		},
+		
+		getSenderName(message) {
+			// Usa il campo SenderUsername se disponibile (dal backend)
+			if (message.SenderUsername) {
+				return message.SenderUsername
+			}
+			
+			// Fallback: usa senderId
+			const senderId = message.senderId || message.SenderID
+			return `User ${senderId}`
+		},
+		
+		async loadUserNames() {
+			// Estrai tutti gli ID utente unici dai messaggi
+			const userIds = [...new Set(this.messages.map(msg => msg.senderId || msg.SenderID))]
+			
+			// Per ora, simula i nomi utente (dovrebbe essere sostituito con chiamate API reali)
+			userIds.forEach(id => {
+				if (!this.userNames[id]) {
+					// Simula nomi utente basati sull'ID
+					const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry']
+					this.userNames[id] = names[id % names.length] || `User ${id}`
+				}
+			})
 		}
 	}
 }
@@ -197,18 +243,29 @@ export default {
 				</div>
 				
 				<div v-else class="messages">
-					<div 
+					<Message 
 						v-for="message in messages" 
 						:key="message.MessageID"
-						class="message-wrapper"
-						:class="{ 'my-message': isMyMessage(message) }"
-					>
-						<div class="message">
-							<div class="message-content">
-								<div class="message-text">{{ message.Content }}</div>
-								<div class="message-time">{{ formatMessageTime(message.Timestamp) }}</div>
-							</div>
-						</div>
+						:message="{
+							id: message.MessageID,
+							content: message.Content,
+							timestamp: message.Timestamp,
+							senderName: isGroupConversation() ? getSenderName(message) : null,
+							senderUsername: message.SenderUsername
+						}"
+						:is-own="isMyMessage(message)"
+						:show-avatar="isGroupConversation() && !isMyMessage(message)"
+						:show-time="true"
+					/>
+					<!-- Debug info solo per gruppi -->
+					<div v-if="isGroupConversation()" style="font-size: 0.8rem; color: #666; margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+						<strong>Debug Gruppo:</strong><br>
+						Conversazione: {{ conversation.Name }}<br>
+						Type: {{ conversation.Type || conversation.type || 'N/A' }}<br>
+						È gruppo: {{ isGroupConversation() }}<br>
+						Messaggi: {{ messages.length }}<br>
+						Primo messaggio SenderUsername: {{ messages[0] ? messages[0].SenderUsername : 'N/A' }}<br>
+						Primo messaggio senderName: {{ messages[0] ? getSenderName(messages[0]) : 'N/A' }}
 					</div>
 				</div>
 			</div>
@@ -458,46 +515,6 @@ export default {
 	gap: 0.5rem;
 }
 
-.message-wrapper {
-	display: flex;
-	width: 100%;
-}
-
-.message-wrapper.my-message {
-	justify-content: flex-end;
-}
-
-.message {
-	max-width: 70%;
-	background: white;
-	border-radius: 18px;
-	padding: 0.75rem 1rem;
-	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.message-wrapper.my-message .message {
-	background: #667eea;
-	color: white;
-}
-
-.message-content {
-	display: flex;
-	flex-direction: column;
-	gap: 0.25rem;
-}
-
-.message-text {
-	font-size: 0.95rem;
-	line-height: 1.4;
-	word-wrap: break-word;
-}
-
-.message-time {
-	font-size: 0.75rem;
-	opacity: 0.7;
-	align-self: flex-end;
-}
-
 /* Message Input */
 .message-input-container {
 	padding: 1rem;
@@ -592,9 +609,6 @@ export default {
 		padding: 0.75rem;
 	}
 	
-	.message {
-		max-width: 85%;
-	}
 	
 	.welcome-features {
 		grid-template-columns: 1fr;

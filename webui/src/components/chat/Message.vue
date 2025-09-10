@@ -78,7 +78,7 @@ export default {
 		
 		<!-- Message Content -->
 		<div class="message-content">
-			<!-- Sender Name (solo per messaggi altrui) -->
+			<!-- Sender Name (solo per messaggi altrui nei gruppi) -->
 			<div v-if="!isOwn && message.senderName" class="sender-name">
 				{{ message.senderName }}
 			</div>

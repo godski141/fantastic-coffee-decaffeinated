@@ -1,38 +1,39 @@
 package database
 
 type User struct {
-    UserID   string
-    Name string
-    Photo string
+    UserID   string `json:"UserID"`
+    Name string `json:"Name"`
+    Photo string `json:"Photo"`
 }
 
 type Conversation struct {
-    ConvID        string
-    Name      string
-    Type      string
-    CreatorID string
-    Photo     string
-    LastMessage string
+    ConvID        string `json:"ConvID"`
+    Name      string `json:"Name"`
+    Type      string `json:"Type"`
+    CreatorID string `json:"CreatorID"`
+    Photo     string `json:"Photo"`
+    LastMessage string `json:"LastMessage"`
 }
 
 type Message struct {
-    MessageID      string
-    ConversationID string
-    SenderID       string
-    Content        string
-    Timestamp      string
-    Status         string
-    Type           string
-    ReplyToMessageID *string // Nullable per messaggi che non sono reply
-    Reactions []Reaction 
+    MessageID      string `json:"MessageID"`
+    ConversationID string `json:"ConversationID"`
+    SenderID       string `json:"SenderID"`
+    SenderUsername string `json:"SenderUsername"`  // NUOVO CAMPO
+    Content        string `json:"Content"`
+    Timestamp      string `json:"Timestamp"`
+    Status         string `json:"Status"`
+    Type           string `json:"Type"`
+    ReplyToMessageID *string `json:"ReplyToMessageID"` // Nullable per messaggi che non sono reply
+    Reactions []Reaction `json:"Reactions"`
 }
 
 type Comment struct {
-    Emoji     string
-    MessageID string
+    Emoji     string `json:"Emoji"`
+    MessageID string `json:"MessageID"`
 }
 
 type Reaction struct {
-    UserID   string 
-    Reaction string 
+    UserID   string `json:"UserID"`
+    Reaction string `json:"Reaction"`
 }

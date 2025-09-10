@@ -211,9 +211,11 @@ func (db *appdbimpl) GetMessagesFromConversation(conversationID string) ([]Messa
         SELECT 
             m.id, m.conversation_id, m.sender_id, m.content, m.timestamp, m.status,
             COALESCE(m.type, 'standard') AS type, m.reply_to_message_id,
+            u.name AS sender_username,
             COALESCE(r.user_id, '') AS reactionUser, 
             COALESCE(r.reaction, '') AS reaction
         FROM messages m
+        LEFT JOIN users u ON m.sender_id = u.id
         LEFT JOIN reactions r ON m.id = r.message_id
         WHERE m.conversation_id = ?
         ORDER BY m.timestamp ASC`, conversationID)
@@ -226,10 +228,10 @@ func (db *appdbimpl) GetMessagesFromConversation(conversationID string) ([]Messa
     messages := make(map[string]Message)
 
     for rows.Next() {
-        var msgID, convId, senderID, content, timestamp, status, msgType, reactionUser, reaction string
+        var msgID, convId, senderID, content, timestamp, status, msgType, senderUsername, reactionUser, reaction string
         var replyToMessageID sql.NullString
 
-        if err := rows.Scan(&msgID, &convId, &senderID, &content, &timestamp, &status, &msgType, &replyToMessageID, &reactionUser, &reaction); err != nil {
+        if err := rows.Scan(&msgID, &convId, &senderID, &content, &timestamp, &status, &msgType, &replyToMessageID, &senderUsername, &reactionUser, &reaction); err != nil {
             return nil, err
         }
 
@@ -239,6 +241,7 @@ func (db *appdbimpl) GetMessagesFromConversation(conversationID string) ([]Messa
                 MessageID: msgID,
                 ConversationID: convId,
                 SenderID:  senderID,
+                SenderUsername: senderUsername,  // NUOVO CAMPO
                 Content:   content,
                 Timestamp: timestamp,
                 Status:    status,

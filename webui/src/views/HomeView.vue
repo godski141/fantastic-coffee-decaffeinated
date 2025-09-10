@@ -640,11 +640,13 @@ export default {
 	right: 0;
 	bottom: 0;
 	background: rgba(0, 0, 0, 0.5);
-	display: flex;
+	display: flex !important;
 	align-items: center;
 	justify-content: center;
-	z-index: 10000;
+	z-index: 99999 !important;
 	padding: 1rem;
+	backdrop-filter: blur(4px);
+	visibility: visible !important;
 }
 
 .modal {
@@ -656,6 +658,10 @@ export default {
 	max-height: 80vh;
 	overflow: hidden;
 	animation: modalSlideIn 0.3s ease-out;
+	position: relative;
+	z-index: 100000 !important;
+	display: block !important;
+	visibility: visible !important;
 }
 
 @keyframes modalSlideIn {
